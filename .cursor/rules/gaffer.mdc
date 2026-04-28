@@ -1,0 +1,10 @@
+---
+description: Gaffer project — architecture, stack, conventions (see CLAUDE.md)
+alwaysApply: true
+---
+
+# Gaffer
+
+The full project specification lives in **`CLAUDE.md`** at the repository root (same directory as `Gemfile`).
+
+When working in this repo, follow **CLAUDE.md** for architecture, domain model, CLI behaviour, testing, AI/BYOK patterns, and phased goals. If something is not covered there, match existing code style in `lib/` and `test/`.
