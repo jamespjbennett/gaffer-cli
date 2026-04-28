@@ -18,4 +18,13 @@ namespace :db do
   end
 end
 
+desc "IRB shell with Bundler, Gaffer, and DB loaded (same as: bin/gaffer console)"
+task :console do
+  $LOAD_PATH.unshift("#{__dir__}/lib")
+  require "bundler/setup"
+  require "gaffer"
+  require "gaffer/console"
+  Gaffer::Console.start
+end
+
 task default: :test

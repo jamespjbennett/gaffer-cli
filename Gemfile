@@ -14,6 +14,7 @@ gem "tty-prompt"
 gem "tty-table"
 
 group :development do
+  gem "irb"
   gem "rake"
 end
 
