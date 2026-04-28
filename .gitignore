@@ -2,5 +2,8 @@
 /vendor/bundle
 /.env
 *.db
+*.sqlite
 *.sqlite3
+/db/gaffer.sqlite
+/tmp/
 .DS_Store
