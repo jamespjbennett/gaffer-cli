@@ -16,6 +16,14 @@ namespace :db do
     Gaffer::Database.migrate
     puts "Migrations applied to #{Gaffer::Database.connection.opts[:database]}"
   end
+
+  desc "Load fictional two-team seed data (Crowden Rovers + Millbrook Wanderers). Runs db:migrate first."
+  task seed: :migrate do
+    $LOAD_PATH.unshift("#{__dir__}/lib")
+    require "bundler/setup"
+    require "gaffer"
+    load File.expand_path("db/seeds/fictional_two_teams.rb", __dir__)
+  end
 end
 
 desc "IRB shell with Bundler, Gaffer, and DB loaded (same as: bin/gaffer console)"

@@ -14,13 +14,23 @@ Full design notes and conventions live in [`CLAUDE.md`](CLAUDE.md).
 ```bash
 cd gaffer_cli
 bundle install
-bundle exec rake db:migrate
+bundle exec rake db:seed
 ```
+
+`db:seed` runs migrations first, then inserts two fictional clubs (**Crowden Rovers**, short `CRW`) and (**Millbrook Wanderers**, short `MBW`), each with 23 players — **Crowden’s squad is rated noticeably higher** so home/away simulations favour them.
+
+Re-running is safe only when **both** exist: seed skips if `CRW` **and** `MBW` are already present. If you previously seeded the old Manchester United data or only one club, **use a new SQLite file** (or delete `db/gaffer.sqlite`) before seeding again.
 
 By default the SQLite file is `db/gaffer.sqlite` (the directory is created if needed). Override with:
 
 ```bash
 export GAFFER_DB_PATH=/absolute/path/to/your.sqlite
+```
+
+To apply migrations only:
+
+```bash
+bundle exec rake db:migrate
 ```
 
 ## CLI
