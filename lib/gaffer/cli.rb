@@ -6,6 +6,12 @@ module Gaffer
   class CLI < Thor
     map c: :console
 
+    desc "start", "Open the main menu (interactive)"
+    def start(*)
+      require_relative "ui/menu"
+      Ui::Menu.run
+    end
+
     desc "console", "Start IRB with Gaffer and database loaded"
     long_desc <<~HELP
       Connects using GAFFER_DB_PATH or ./db/gaffer.sqlite then opens IRB.
@@ -14,7 +20,7 @@ module Gaffer
     HELP
     def console(*)
       require_relative "console"
-      Gaffer::Console.start
+      Console.start
     end
 
     desc "version", "Print version"
@@ -22,6 +28,6 @@ module Gaffer
       puts Gaffer::VERSION
     end
 
-    default_task :version
+    default_task :start
   end
 end

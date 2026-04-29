@@ -39,8 +39,9 @@ From the `gaffer_cli` directory:
 
 ```bash
 chmod +x bin/gaffer   # once, if your checkout doesn’t mark it executable yet
-./bin/gaffer version  # prints the version (default when no args)
-./bin/gaffer console  # IRB + DB + repos; `./bin/gaffer c` works too
+./bin/gaffer           # opens the interactive menu (same as `./bin/gaffer start`)
+./bin/gaffer version    # prints the version string
+./bin/gaffer console    # IRB + DB + repos; `./bin/gaffer c` works too
 ```
 
 Or:
