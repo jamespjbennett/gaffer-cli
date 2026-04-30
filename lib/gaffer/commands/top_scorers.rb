@@ -8,6 +8,8 @@ module Gaffer
   module Commands
     # `gaffer scorers` — chart for the active league (or `--previous` / `--year`, like `table`).
     module TopScorers
+      DISPLAY_LIMIT = 20
+
       class << self
         # @return [Symbol] `:ok`, `:no_active_league`, or `:no_standings_target`
         def run(pastel: Pastel.new, out: $stdout, league: nil, previous: false, year: nil)
@@ -48,10 +50,17 @@ module Gaffer
             return :ok
           end
 
-          rows = hydrated_rows(totals)
+          slice = totals.first(DISPLAY_LIMIT)
+          rows = hydrated_rows(slice)
           out.puts Presenters::TopScorersTty.render(pastel:, rows:, managed_club_id: managed_id)
           goal_sum = totals.sum { |t| t[:goals] }
-          out.puts pastel.dim("#{goal_sum} goals · #{rows.size} players on the chart.")
+          tail =
+            if totals.size > DISPLAY_LIMIT
+              " · showing top #{DISPLAY_LIMIT} of #{totals.size} scorers"
+            else
+              " · #{rows.size} players on the chart"
+            end
+          out.puts pastel.dim("#{goal_sum} goals#{tail}.")
           out.puts
           :ok
         end
