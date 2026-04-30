@@ -797,15 +797,16 @@ puts "Smoke test passed."
 ## Development Phases
 
 ### Phase 1a — Foundation ✅ (done)
-- [x] Domain models: Club, Player, Fixture, Match, MatchResult, MatchEngine, Manager
-- [x] SQLite schema + migrations (clubs, players, fixtures, matches, managers)
+- [x] Domain models: Club, Player, Fixture, Match, MatchResult, MatchEngine, Manager, **League**
+- [x] `LeagueRepository` (persist league / season rows)
+- [x] SQLite schema + migrations (clubs, players, fixtures, matches, managers, **leagues**)
 - [x] Seed data: 10 fictional clubs in paired tiers (`db/seeds/fictional_ten_teams.rb`; short codes `CRW … MBW`)
 - [x] First-run onboarding: name + club selection persisted in `managers` table
 - [x] Manager identity shown in CLI header
 - [x] `bin/gaffer` opens interactive menu with GAFFER block-font hero
 - [x] Play game: simulate managed club vs foil, display result
 - [x] Match engine: Poisson goal sampling, tactic modifiers, home advantage
-- [x] Tests: match engine, manager repository, DB migrations
+- [x] Tests: match engine, league + manager repos, DB migrations
 
 ---
 
@@ -825,11 +826,11 @@ puts "Smoke test passed."
 - **`db/seeds/fictional_ten_teams.rb`** — ten clubs in five loosely paired tiers (deterministic procedural squads, **23 players** each).
 - Canonical short codes: `CRW STB KLF VPK AHU RCT FAB LAN HCY MBW`. Skip/aborted-on-partial behaviour unchanged.
 
-**Step 2 — `leagues` migration + domain model**
+**Step 2 — `leagues` migration + domain model** ✅ (partially: table + repo; `clubs.league_id` already exists from migration 001)
 - Migration `006_create_leagues.rb`: `id`, `name`, `year` (integer), `status` (string), `current_gameweek` (integer, default 1)
-- Migration `007_add_league_id_to_clubs.rb`: add nullable `league_id` integer column to `clubs`
+- ~~Migration `007_add_league_id_to_clubs`~~ — **not needed:** `clubs.league_id` is already in schema 001 (nullable, indexed)
 - `Domain::League` struct: `id`, `name`, `year`, `status` (symbol), `current_gameweek`
-- `Repositories::LeagueRepository`: `find(id)`, `active` (first with `status: :active`), `save(league)`, `complete!(id)`
+- `Repositories::LeagueRepository`: `find(id)`, `active`, `save(league)`, `complete!(id)`, `latest_year`
 
 **Step 3 — `Domain::FixtureGenerator` (pure, no DB)**
 - Takes `Array<Integer>` of club IDs, returns `Array<Fixture>` with `gameweek`, `home_club_id`, `away_club_id`, `league_id` set, `id: nil`, `played: false`
