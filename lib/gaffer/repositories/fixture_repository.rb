@@ -24,6 +24,15 @@ module Gaffer
           end
         end
 
+        # Bulk insert for generated schedules (same shape as `domain_to_attrs`).
+        def import_new_fixtures!(fixtures)
+          return 0 if fixtures.empty?
+
+          rows = fixtures.map { domain_to_attrs(_1) }
+          fixtures_ds.multi_insert(rows)
+          rows.size
+        end
+
         private
 
         def fixtures_ds

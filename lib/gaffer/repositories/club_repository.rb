@@ -24,6 +24,10 @@ module Gaffer
           end
         end
 
+        def assign_all_to_league!(league_id)
+          clubs_ds.update(league_id: league_id.to_i)
+        end
+
         private
 
         def clubs_ds
