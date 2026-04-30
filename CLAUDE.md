@@ -101,6 +101,7 @@ gaffer/
 │   │   ├── player_availability.rb  # Injury/suspension status per gameweek
 │   │   ├── league.rb
 │   │   ├── fixture.rb
+│   │   ├── fixture_generator.rb   # pure round-robin schedule (double home & away)
 │   │   ├── match.rb
 │   │   ├── match_engine.rb         # Deterministic simulation core
 │   │   ├── match_selection.rb      # Chosen XI + tactic for a fixture
@@ -806,7 +807,7 @@ puts "Smoke test passed."
 - [x] `bin/gaffer` opens interactive menu with GAFFER block-font hero
 - [x] Play game: simulate managed club vs foil, display result
 - [x] Match engine: Poisson goal sampling, tactic modifiers, home advantage
-- [x] Tests: match engine, league + manager repos, DB migrations
+- [x] Tests: match engine, **`FixtureGenerator`**, league + manager repos, DB migrations
 
 ---
 
@@ -832,10 +833,10 @@ puts "Smoke test passed."
 - `Domain::League` struct: `id`, `name`, `year`, `status` (symbol), `current_gameweek`
 - `Repositories::LeagueRepository`: `find(id)`, `active`, `save(league)`, `complete!(id)`, `latest_year`
 
-**Step 3 — `Domain::FixtureGenerator` (pure, no DB)**
-- Takes `Array<Integer>` of club IDs, returns `Array<Fixture>` with `gameweek`, `home_club_id`, `away_club_id`, `league_id` set, `id: nil`, `played: false`
-- Uses standard round-robin rotation: fix one team, rotate the rest across N-1 rounds; repeat reversed for the return leg
-- Tested in isolation (no DB, no repos)
+**Step 3 — `Domain::FixtureGenerator` ✅**
+- ~~Takes~~ `FixtureGenerator.generate(club_ids:, league_id:)` returns `Array<Fixture>` (`id` nil, `played` false, `season_id` = league row id)
+- Circle-method round-robin for first `(n−1)` gameweeks + same slots with flipped home/away for the return `(n−1)` gameweeks
+- Covered by **`test/domain/fixture_generator_test.rb`** (requires even `n ≥ 2`, distinct ids)
 
 **Step 4 — `Commands::StartLeague`**
 - Guard: refuse if a league is already `:active`
