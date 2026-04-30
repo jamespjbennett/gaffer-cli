@@ -112,7 +112,11 @@ describe Gaffer::Commands::NextFixture do
       _(Gaffer::Commands::NextFixture.run(pastel:, out: StringIO.new, prompt:)).must_equal :ok
     end
 
-    _(Gaffer::Commands::NextFixture.run(pastel:, out: StringIO.new, prompt:)).must_equal :season_completed
+    log = StringIO.new
+    _(Gaffer::Commands::NextFixture.run(pastel:, out: log, prompt:)).must_equal :season_completed
+
+    _(log.string).must_match(/Final standings/)
+    _(log.string).must_match(/┌/)
 
     final = Gaffer::Repositories::LeagueRepository.find(@league.id)
     _(final.status).must_equal :complete

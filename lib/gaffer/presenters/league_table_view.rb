@@ -2,7 +2,7 @@
 
 module Gaffer
   module Presenters
-    # Lightweight table rendering until full `tty-table` (Step 6).
+    # Compact text standings for snippets; full grid lives in `LeagueTableTty` (Step 6).
     module LeagueTableView
       module_function
 

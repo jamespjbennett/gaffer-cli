@@ -7,6 +7,7 @@ require "tty-prompt"
 require_relative "../commands/play_match"
 require_relative "../commands/start_league"
 require_relative "../commands/next_fixture"
+require_relative "../commands/league_standings"
 require_relative "onboarding"
 
 module Gaffer
@@ -40,8 +41,12 @@ module Gaffer
           out.puts render_header(pastel, manager: mgr, managed_club: club)
           out.puts
 
+          completed_rows = Repositories::LeagueRepository.completed_ordered
+
           choice = prompt.select("What would you like to do?") do |menu|
             menu.choice "Next fixture · league day", :next_fixture if Repositories::LeagueRepository.active
+            menu.choice "League table", :league_table if Repositories::LeagueRepository.active
+            menu.choice "Archived league table…", :archived_league_table unless completed_rows.empty?
             menu.choice "Play game", :play
             menu.choice "Start new season", :start_league unless Repositories::LeagueRepository.active
             menu.choice "Quit", :quit
@@ -51,6 +56,26 @@ module Gaffer
           when :next_fixture
             out.puts
             Gaffer::Commands::NextFixture.run(pastel:, out: out, prompt: prompt)
+            out.puts
+            prompt.keypress(pastel.dim("Press any key to return to the menu…"))
+          when :archived_league_table
+            out.puts
+            archived_choices =
+              Repositories::LeagueRepository.completed_ordered.map do |lg|
+                { name: "#{lg.year} · #{lg.name}", value: lg }
+              end
+
+            sel = prompt.select(
+              pastel.bold("Which archived season?"),
+              archived_choices,
+              filter: true
+            )
+            Gaffer::Commands::LeagueStandings.run(pastel:, out:, league: sel)
+            out.puts
+            prompt.keypress(pastel.dim("Press any key to return to the menu…"))
+          when :league_table
+            out.puts
+            Gaffer::Commands::LeagueStandings.run(pastel:, out: out)
             out.puts
             prompt.keypress(pastel.dim("Press any key to return to the menu…"))
           when :start_league

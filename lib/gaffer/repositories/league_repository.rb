@@ -36,6 +36,18 @@ module Gaffer
           row ? row[:year] : nil
         end
 
+        # Newest complete row first (tie-break on id).
+        def completed_ordered
+          ds.where(status: "complete").order(Sequel.desc(:year), Sequel.desc(:id)).map { row_to_domain(_1) }
+        end
+
+        # Most recent DB row for this calendar year (active, complete, or pending).
+        def find_for_calendar_year(year)
+          y = year.to_i
+          row = ds.where(year: y).order(Sequel.desc(:id)).first
+          row ? row_to_domain(row) : nil
+        end
+
         private
 
         def ds

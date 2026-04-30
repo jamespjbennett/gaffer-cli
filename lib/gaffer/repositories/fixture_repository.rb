@@ -82,6 +82,20 @@ module Gaffer
           end
         end
 
+        # Clubs that took part in `season_id`, derived from fixtures (works for archived leagues once
+        # `clubs.league_id` has moved on to a newer season row).
+        def club_ids_for_season(season_id)
+          sid = season_id.to_i
+          return [] unless sid.positive?
+
+          fixtures_ds
+            .where(season_id: sid)
+            .select(:home_club_id, :away_club_id)
+            .flat_map { |row| [row[:home_club_id], row[:away_club_id]] }
+            .uniq
+            .sort
+        end
+
         private
 
         def fixtures_ds

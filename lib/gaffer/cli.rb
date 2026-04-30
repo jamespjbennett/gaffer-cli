@@ -6,6 +6,28 @@ module Gaffer
   class CLI < Thor
     map c: :console
 
+    desc "table", "Standings — active league default; use --previous or --year for archives"
+    method_option :previous, type: :boolean, default: false, aliases: "-p",
+                  desc: "Show the newest completed league"
+    method_option :year, type: :numeric,
+                  banner: "YEAR",
+                  desc: "Show standings for the most recent league with this calendar year"
+    def table(*)
+      require_relative "../gaffer"
+      require "pastel"
+      require_relative "commands/league_standings"
+
+      yr = options[:year]
+      yr = Integer(yr) unless yr.nil?
+
+      Gaffer::Commands::LeagueStandings.run(
+        pastel: Pastel.new,
+        out: $stdout,
+        previous: options[:previous],
+        year: yr
+      )
+    end
+
     desc "next", "Play the upcoming league gameweek (simulate every fixture in this round)"
     def next(*)
       require_relative "../gaffer"

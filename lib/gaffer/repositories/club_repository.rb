@@ -18,6 +18,14 @@ module Gaffer
           clubs_ds.where(league_id: lid).order(:name).map { row_to_domain(_1) }
         end
 
+        # Ordered roster by id list (historical leagues where `league_id` column no longer matches).
+        def for_ids_ordered(ids)
+          uniq = Array(ids).map(&:to_i).uniq
+          return [] if uniq.empty?
+
+          clubs_ds.where(id: uniq).order(:name).map { row_to_domain(_1) }
+        end
+
         def save(club)
           attrs = domain_to_attrs(club)
           if club.id

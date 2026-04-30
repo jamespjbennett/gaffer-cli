@@ -5,7 +5,9 @@ require "pastel"
 module Gaffer
   module Commands
     # Runs every fixture in the current gameweek for the active league (your XI match with flair,
-    # everything else muted), persists results, bumps the league pointer, snapshots the standings (Step 5).
+    # everything else muted), persists results, advances `current_gameweek` (Step 5), and wraps the
+    # campaign (Step 7): final round prints full tty standings, confirms `LeagueRepository.complete!`,
+    # then prompts `Start Season [year+1]? [Y/n]` → `StartLeague`.
     module NextFixture
       SUMMARY_BAR_W = 56
 
@@ -91,6 +93,7 @@ module Gaffer
                 current_gameweek: gameweek + 1
               )
             )
+            Repositories::LeagueRepository.complete!(league.id) if gameweek >= max_gw
           end
 
           final_round = gameweek >= max_gw
@@ -105,7 +108,7 @@ module Gaffer
             final_round: final_round
           )
 
-          offer_next_season(pastel:, out:, prompt:) if final_round
+          offer_next_season(league:, pastel:, out:, prompt:) if final_round
 
           final_round ? :season_completed : :ok
         rescue KeyError => e
@@ -132,7 +135,7 @@ module Gaffer
           out.puts pastel.green("Every fixture has a result — season #{league.year} ledger is sealed.")
           print_final_table(league:, managed_club_id:, pastel:, out:)
 
-          offer_next_season(pastel:, out:, prompt: prompt)
+          offer_next_season(league:, pastel:, out:, prompt: prompt)
 
           :season_completed
         end
@@ -213,8 +216,31 @@ module Gaffer
           end
 
           out.puts pastel.dim("─" * SUMMARY_BAR_W)
-          print_standings_snapshot(out:, pastel:, season_id: league.id, managed_club_id:)
+
+          print_post_match_standings(
+            final_round: final_round,
+            out: out,
+            pastel: pastel,
+            league_id: league.id,
+            league_year: league.year,
+            managed_club_id: managed_club_id
+          )
+
           out.puts
+        end
+
+        def print_post_match_standings(final_round:, out:, pastel:, league_id:, league_year:, managed_club_id:)
+          if final_round
+            out.puts pastel.bold.white("Final standings · #{league_year}")
+            out.puts Presenters::LeagueTableTty.render_for_season(
+              league_id: league_id,
+              pastel: pastel,
+              managed_club_id: managed_club_id
+            )
+            out.puts pastel.dim("Season #{league_year} over — trophy cabinet dusted.")
+          else
+            print_standings_snapshot(out:, pastel:, season_id: league_id, managed_club_id:)
+          end
         end
 
         def print_full_result(out:, pastel:, summary:, clubs_by_id:)
@@ -251,16 +277,17 @@ module Gaffer
         end
 
         def print_final_table(league:, managed_club_id:, pastel:, out:)
-          clubs = Repositories::ClubRepository.for_league(league.id)
-          results = Repositories::FixtureRepository.settled_scores_for_season(league.id)
-          rows = Domain::LeagueTable.standings_for(clubs:, results: results)
-          pos = Domain::LeagueTable.positions_by_club(rows)
-          out.puts pastel.bold.white("Final table · #{league.year}")
-          Presenters::LeagueTableView.print_full(out:, pastel:, rows:, positions_by_club: pos, managed_club_id:, heading: false)
+          out.puts pastel.bold.white("Final standings · #{league.year}")
+          out.puts Presenters::LeagueTableTty.render_for_season(
+            league_id: league.id,
+            pastel: pastel,
+            managed_club_id: managed_club_id
+          )
           out.puts
         end
 
-        def offer_next_season(pastel:, out:, prompt:)
+        # Step 7: default **Yes** on [Y/n] — declining returns to caller (menu resumes).
+        def offer_next_season(league:, pastel:, out:, prompt:)
           tty =
             prompt || begin
               require "tty-prompt"
@@ -271,9 +298,10 @@ module Gaffer
 
           return unless tty
 
+          out.puts pastel.dim("#{league.name} · #{league.year} archived in the ledger.")
           next_calendar = Repositories::LeagueRepository.latest_year.to_i + 1
-          q = pastel.bold("Start #{next_calendar} season? ") + pastel.dim("(auto-builds fixtures for every seeded club)")
-          return unless tty.yes?(q)
+          q = pastel.bold("Start Season #{next_calendar}? ") + pastel.dim("[Y/n]")
+          return unless tty.yes?(q, default: true)
 
           Commands::StartLeague.run(pastel:, out:)
           nil

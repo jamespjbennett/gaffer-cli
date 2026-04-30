@@ -64,12 +64,27 @@ describe Gaffer::Repositories::LeagueRepository do
     _(Gaffer::Repositories::LeagueRepository.latest_year).must_equal 2027
   end
 
-  it "complete! sets status" do
-    saved = Gaffer::Repositories::LeagueRepository.save(
-      Gaffer::Domain::League.new(name: "X", year: 2026, status: :active, current_gameweek: 18)
+  it "completed_ordered surfaces newest archived row first" do
+    Gaffer::Repositories::LeagueRepository.save(
+      Gaffer::Domain::League.new(name: "Old cap", year: 2025, status: :complete, current_gameweek: 99)
     )
-    Gaffer::Repositories::LeagueRepository.complete!(saved.id)
-    _(Gaffer::Repositories::LeagueRepository.find(saved.id).status).must_equal :complete
-    _(Gaffer::Repositories::LeagueRepository.active).must_be_nil
+    Gaffer::Repositories::LeagueRepository.save(
+      Gaffer::Domain::League.new(name: "Recent cap", year: 2026, status: :complete, current_gameweek: 19)
+    )
+
+    ids = Gaffer::Repositories::LeagueRepository.completed_ordered.map(&:year)
+    _(ids.first).must_equal 2026
+  end
+
+  it "find_for_calendar_year returns newest row for duplicate years" do
+    Gaffer::Repositories::LeagueRepository.save(
+      Gaffer::Domain::League.new(name: "First", year: 2028, status: :complete, current_gameweek: 18)
+    )
+    newer =
+      Gaffer::Repositories::LeagueRepository.save(
+        Gaffer::Domain::League.new(name: "Second", year: 2028, status: :active, current_gameweek: 1)
+      )
+
+    _(Gaffer::Repositories::LeagueRepository.find_for_calendar_year(2028).id).must_equal newer.id
   end
 end

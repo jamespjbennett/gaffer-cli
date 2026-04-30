@@ -111,6 +111,25 @@ describe "Repositories" do
         _(repo_f.for_season(1).size).must_equal 1
       end
     end
+
+    it "collects participant club ids for a season roster" do
+      with_isolated_database do
+        repo_c = Gaffer::Repositories::ClubRepository
+        repo_f = Gaffer::Repositories::FixtureRepository
+
+        ids = []
+        ids << repo_c.save(Gaffer::Domain::Club.new(name: "East", short_name: "EST", league_id: 99)).id
+        ids << repo_c.save(Gaffer::Domain::Club.new(name: "North", short_name: "NRH", league_id: 99)).id
+        ids << repo_c.save(Gaffer::Domain::Club.new(name: "West", short_name: "WST", league_id: 77)).id
+
+        repo_f.save(
+          Gaffer::Domain::Fixture.new(season_id: 7, gameweek: 1, home_club_id: ids[0], away_club_id: ids[1], played: false)
+        )
+
+        fetched = repo_f.club_ids_for_season(7).sort
+        _(fetched).must_equal ids.first(2).sort
+      end
+    end
   end
 
   describe Gaffer::Repositories::MatchRepository do
