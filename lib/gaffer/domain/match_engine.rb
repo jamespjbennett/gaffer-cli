@@ -9,12 +9,13 @@ module Gaffer
     # Pure, deterministic simulator: squad composition + tactics + RNG seed → Poisson goals.
     # See CLAUDE.md — no persistence, no CLI.
     class MatchEngine
+      # Tweaked so ends feel noticeably different in sims (still symmetric around :balanced).
       TACTIC_MODIFIERS = {
-        all_out_attack: { attack_multiplier: 1.15, defense_multiplier: 0.80 },
-        attacking:        { attack_multiplier: 1.08, defense_multiplier: 0.92 },
+        all_out_attack: { attack_multiplier: 1.28, defense_multiplier: 0.72 },
+        attacking:        { attack_multiplier: 1.12, defense_multiplier: 0.88 },
         balanced:         { attack_multiplier: 1.0,  defense_multiplier: 1.0 },
-        defensive:        { attack_multiplier: 0.92, defense_multiplier: 1.08 },
-        park_the_bus:     { attack_multiplier: 0.80, defense_multiplier: 1.15 }
+        defensive:        { attack_multiplier: 0.88, defense_multiplier: 1.12 },
+        park_the_bus:     { attack_multiplier: 0.72, defense_multiplier: 1.28 }
       }.freeze
 
       DEF_EPS = 1e-9

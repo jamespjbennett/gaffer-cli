@@ -2,6 +2,9 @@
 
 require "pastel"
 
+require_relative "../domain/lineup"
+require_relative "../presenters/matchday_squad"
+
 module Gaffer
   module Commands
     # Runs every fixture in the current gameweek for the active league (your XI match with flair,
@@ -13,14 +16,32 @@ module Gaffer
 
       Summary = Struct.new(:fixture, :result, keyword_init: true)
 
+      # Rows for `TTY::Prompt#select` — labels must mirror `Domain::MatchEngine::TACTIC_MODIFIERS` keys.
+      APPROACH_CHOICES = [
+        ["All-out attack — lash forward; pray at the back", :all_out_attack],
+        ["Attacking — positive without total chaos", :attacking],
+        ["Balanced — steady Eddy", :balanced],
+        ["Defensive — spoil and frustrate", :defensive],
+        ["Park the bus — low blocks; invite pressure", :park_the_bus]
+      ].freeze
+
+      TACTIC_HEADLINE = {
+        all_out_attack: "All-out attack",
+        attacking:      "Attacking",
+        balanced:       "Balanced",
+        defensive:      "Defensive",
+        park_the_bus:   "Park the bus"
+      }.freeze
+
       class << self
         # @param pastel [Pastel]
         # @param out [IO]
-        # @param prompt [#yes?,nil] end-of-season `TTY::Prompt` from the interactive menu when available.
-        #
+        # @param prompt [#yes?, #select, nil] interactive TTY from the menu where available.
+        # @param manager_tactic [Symbol, nil] when set (e.g. tests), skips the tactic menu and uses this shape.
+        # @param manager_lineup [Array<Domain::Player>, nil] eleven players from your club to skip dugout UI & validation
         # @return [Symbol] `:ok`, `:no_active_league`, `:no_manager`, `:squads_incomplete`,
         #   `:fixture_data_error`, or `:season_completed`
-        def run(pastel: Pastel.new, out: $stdout, prompt: nil)
+        def run(pastel: Pastel.new, out: $stdout, prompt: nil, manager_tactic: nil, manager_lineup: nil)
           ensure_db_connected
 
           league = Repositories::LeagueRepository.active
@@ -73,12 +94,63 @@ module Gaffer
             return :fixture_data_error
           end
 
+          full_squad = Repositories::PlayerRepository.for_club(managed_club_id)
+
+          if full_squad.empty?
+            out.puts pastel.red("Your club has zero players loaded — rerun db seed.")
+            return :squads_incomplete
+          end
+
+          suggested = Domain::Lineup.pick_best_xi(full_squad)
+          if suggested.size != 11
+            out.puts pastel.red("Not enough registered players (#{full_squad.size}) to stitch an XI.")
+            return :squads_incomplete
+          end
+
+          mid_tmp = managed_club_id.to_i
+          opp_id_tmp =
+            managed_next.home_club_id.to_i == mid_tmp ? managed_next.away_club_id : managed_next.home_club_id
+          opp_name_short = clubs_by_id.fetch(opp_id_tmp.to_i).name.to_s.strip
+          hosting_tmp = managed_next.home_club_id.to_i == mid_tmp
+
+          managed_club = clubs_by_id.fetch(managed_club_id)
+
+          user_xi =
+            resolve_manager_lineup(
+              preset: manager_lineup,
+              suggested_xi: suggested,
+              full_squad: full_squad,
+              club: managed_club,
+              prompt: prompt,
+              pastel: pastel,
+              out: out,
+              gameweek: gameweek,
+              opponent: opp_name_short,
+              hosting: hosting_tmp
+            )
+
+          unless user_xi&.size == 11
+            out.puts pastel.red("Pick a legal XI (11 outfield + keeper distribution) before kicking off.")
+            return :squads_incomplete
+          end
+
+          manager_shape =
+            resolve_manager_shape(
+              manager_tactic:, prompt:, pastel:, out:,
+              managed_fixture: managed_next, clubs_by_id:, managed_club_id:
+            )
+
           engine = Domain::MatchEngine.new
           summaries = []
 
           Gaffer::Database.db.transaction do
             round_fixtures.each do |fx|
-              result = simulate_with_squads(fx:, clubs_by_id:, engine:, seed: fx.id.to_i)
+              home_tac, away_tac = tactics_pair_for(fixture: fx, managed_id: managed_club_id, shape: manager_shape)
+              result = simulate_with_squads(
+                fx:, clubs_by_id:, engine:, seed: fx.id.to_i,
+                home_tactic: home_tac, away_tactic: away_tac,
+                managed_club_id:, managed_xi: user_xi
+              )
               Repositories::MatchRepository.save(build_match(fixture_id: fx.id, result:))
               Repositories::FixtureRepository.save(fixture_played(fx))
               summaries << Summary.new(fixture: fx, result:)
@@ -105,7 +177,8 @@ module Gaffer
             clubs_by_id: clubs_by_id,
             gameweek: gameweek,
             league: league,
-            final_round: final_round
+            final_round: final_round,
+            manager_shape: manager_shape
           )
 
           offer_next_season(league:, pastel:, out:, prompt:) if final_round
@@ -117,6 +190,113 @@ module Gaffer
         end
 
         private
+
+        def validate_preset_manager_lineup(preset, squad)
+          return nil if preset.nil?
+
+          list = preset.is_a?(Array) ? preset : nil
+          return nil unless list && list.size == 11
+
+          allowed_ids = squad.each_with_object({}) { |pl, acc| acc[pl.id] = true }
+          seen = {}
+
+          canon =
+            list.map do |maybe|
+              return nil unless maybe.respond_to?(:id)
+
+              id = maybe.id
+              return nil unless allowed_ids[id]
+              return nil if seen[id]
+
+              seen[id] = true
+              row = squad.find { |s| s.id == id }
+              return nil unless row
+
+              row
+            end
+
+          canon
+        end
+
+        def resolve_manager_lineup(preset:, suggested_xi:, full_squad:, club:, prompt:, pastel:, out:, gameweek:,
+                                   opponent:, hosting:)
+          locked = validate_preset_manager_lineup(preset, full_squad)
+          return locked if locked
+
+          xi = suggested_xi.dup
+
+          Presenters::MatchdaySquad.print_heading(
+            out: out, pastel: pastel, club: club, gameweek: gameweek,
+            opponent: opponent, hosting: hosting
+          )
+          Presenters::MatchdaySquad.print_roster_note(out: out, pastel: pastel)
+          Presenters::MatchdaySquad.print_full_squad_table(out: out, pastel: pastel, players: full_squad)
+          Presenters::MatchdaySquad.print_xi_heading(out: out, pastel: pastel)
+          Presenters::MatchdaySquad.print_xi_lines(out: out, pastel: pastel, xi: xi)
+
+          unless prompt&.respond_to?(:yes?)
+            out.puts pastel.dim("Non-interactive shell — auto-starting suggested XI.")
+            return xi
+          end
+
+          return xi if prompt.yes?(pastel.bold("Start with this XI?"), default: true)
+
+          unless prompt.respond_to?(:select)
+            out.puts pastel.dim("TTY select unavailable — keeping suggested XI.")
+            return xi
+          end
+
+          loop do
+            # Hash entries — plain [label, value] pairs break: tty-prompt flattens args and splits tuples.
+            slot_payload = [
+              { name: "Lineup confirmed — continue", value: :done }
+            ] + Domain::Lineup::XI_SLOT_LABELS.each_with_index.map do |lbl, idx|
+              { name: "Change #{lbl} · #{xi[idx].name}", value: idx }
+            end
+
+            slot_pick = prompt.select(pastel.bold("Adjust your XI"), slot_payload, cycle: true)
+            break if slot_pick == :done
+
+            slot_idx = Integer(slot_pick)
+            desired_pos = Domain::Lineup::FORMATION_SLOTS[slot_idx]
+            current = xi[slot_idx]
+
+            other_ids =
+              xi.each_with_index.each_with_object([]) do |(pl, j), arr|
+                arr << pl.id if j != slot_idx
+              end
+
+            pool = full_squad.reject { |pl| other_ids.include?(pl.id) }
+            pos_fit = pool.select { |pl| pl.position&.to_sym == desired_pos }
+            roster = pos_fit.empty? ? pool : pos_fit
+
+            replacement_payload =
+              [{ name: "(stay on #{current.name})", value: current }] +
+              roster.reject { |pl| pl.id == current.id }
+                    .sort_by { |pl| [-Domain::Lineup.grade_scalar(pl)] }
+                    .map { |pl| { name: "#{pl.name}  OVR #{pl.overall}", value: pl } }
+
+            replacement = prompt.select(
+              pastel.bold("Who wears #{Domain::Lineup::XI_SLOT_LABELS[slot_idx]} (#{desired_pos.upcase})?"),
+              replacement_payload,
+              cycle: true
+            )
+
+            xi[slot_idx] = replacement
+          end
+
+          # Editing path: squad table was handy for swaps; tuck it away so tactics step isn’t drowned out.
+          out.print("\e[2J\e[H")
+          Presenters::MatchdaySquad.print_heading(
+            out: out, pastel: pastel, club: club, gameweek: gameweek,
+            opponent: opponent, hosting: hosting
+          )
+          out.puts pastel.dim("Squad list hidden — XI locked.")
+          Presenters::MatchdaySquad.print_xi_heading(out: out, pastel: pastel)
+          Presenters::MatchdaySquad.print_xi_lines(out: out, pastel: pastel, xi: xi)
+
+          xi
+        end
 
         def ensure_db_connected
           Gaffer::Database.connect
@@ -168,27 +348,85 @@ module Gaffer
           )
         end
 
-        def simulate_with_squads(fx:, clubs_by_id:, engine:, seed:)
+        def simulate_with_squads(fx:, clubs_by_id:, engine:, seed:, home_tactic:, away_tactic:, managed_club_id:, managed_xi:)
           home_club = clubs_by_id.fetch(fx.home_club_id)
           away_club = clubs_by_id.fetch(fx.away_club_id)
-          home_players = Repositories::PlayerRepository.for_club(home_club.id)
-          away_players = Repositories::PlayerRepository.for_club(away_club.id)
 
-          raise KeyError, "home squad empty" if home_players.empty?
-          raise KeyError, "away squad empty" if away_players.empty?
+          hid = fx.home_club_id.to_i
+          aid = fx.away_club_id.to_i
+          mid = managed_club_id.to_i
+
+          home_full = Repositories::PlayerRepository.for_club(hid)
+          away_full = Repositories::PlayerRepository.for_club(aid)
+
+          raise KeyError, "home XI empty" if home_full.empty?
+          raise KeyError, "away XI empty" if away_full.empty?
+
+          home_pick =
+            hid == mid ? managed_xi : Domain::Lineup.pick_best_xi(home_full)
+          away_pick =
+            aid == mid ? managed_xi : Domain::Lineup.pick_best_xi(away_full)
+
+          unless home_pick.size == 11 && away_pick.size == 11
+            raise KeyError, "XI must be eleven each side"
+          end
 
           engine.simulate(
             home_club: home_club,
-            home_players: home_players,
+            home_players: home_pick,
             away_club: away_club,
-            away_players: away_players,
-            home_tactic: :balanced,
-            away_tactic: :balanced,
+            away_players: away_pick,
+            home_tactic: home_tactic,
+            away_tactic: away_tactic,
             seed: seed
           )
         end
 
-        def print_after_play(pastel, out, summaries:, managed_club_id:, clubs_by_id:, gameweek:, league:, final_round:)
+        # @return [Symbol] validated tactic consumed by MatchEngine for *your* side this gameweek
+        def coerce_manager_shape(raw)
+          return :balanced if raw.nil?
+
+          sym = raw.respond_to?(:to_sym) ? raw.to_sym : :balanced
+          Domain::MatchEngine::TACTIC_MODIFIERS.key?(sym) ? sym : :balanced
+        end
+
+        def resolve_manager_shape(manager_tactic:, prompt:, pastel:, out:, managed_fixture:, clubs_by_id:, managed_club_id:)
+          return coerce_manager_shape(manager_tactic) unless manager_tactic.nil?
+
+          return :balanced unless prompt.respond_to?(:select)
+
+          mid = managed_club_id.to_i
+          opp_id =
+            managed_fixture.home_club_id.to_i == mid ? managed_fixture.away_club_id : managed_fixture.home_club_id
+          opp_name = clubs_by_id.fetch(opp_id).name.to_s.strip
+          home_or_away =
+            managed_fixture.home_club_id.to_i == mid ? "Hosting" : "Visiting"
+
+          banner = +"#{pastel.bold("Pick your tactical shape")}"
+          banner << pastel.dim("  · #{home_or_away} #{opp_name}")
+          out.puts
+          sel = prompt.select(
+            banner,
+            APPROACH_CHOICES.map { |label, sym| { name: label, value: sym } }
+          )
+
+          coerce_manager_shape(sel)
+        end
+
+        def tactics_pair_for(fixture:, managed_id:, shape:)
+          tactical = coerce_manager_shape(shape)
+          hid = fixture.home_club_id.to_i
+          aid = fixture.away_club_id.to_i
+          mid = managed_id.to_i
+
+          case mid
+          when hid then [tactical, :balanced]
+          when aid then [:balanced, tactical]
+          else            [:balanced, :balanced]
+          end
+        end
+
+        def print_after_play(pastel, out, summaries:, managed_club_id:, clubs_by_id:, gameweek:, league:, final_round:, manager_shape: :balanced)
           yours = summaries.find { |s| club_ids_for(s.fixture).include?(managed_club_id) }
           others =
             summaries
@@ -202,7 +440,7 @@ module Gaffer
           out.puts pastel.dim("─" * SUMMARY_BAR_W)
           out.puts pastel.bold.white("YOUR RESULT")
           if yours
-            print_full_result(out:, pastel:, summary: yours, clubs_by_id:)
+            print_full_result(out:, pastel:, summary: yours, clubs_by_id:, manager_shape: manager_shape)
           else
             out.puts pastel.red("Could not locate your club in this round — data mismatch.")
           end
@@ -243,7 +481,7 @@ module Gaffer
           end
         end
 
-        def print_full_result(out:, pastel:, summary:, clubs_by_id:)
+        def print_full_result(out:, pastel:, summary:, clubs_by_id:, manager_shape: :balanced)
           fx = summary.fixture
           res = summary.result
           home = clubs_by_id[fx.home_club_id]
@@ -251,6 +489,8 @@ module Gaffer
           hg = pastel.bold.green(res.home_score.to_s.rjust(2))
           ag = pastel.bold.green(res.away_score.to_s.rjust(2))
 
+          label = tactic_label(manager_shape).to_s
+          out.puts pastel.dim("Your shape: #{label}")
           out.puts pastel.dim("#{home.name} vs #{away.name}")
           out.puts "  #{pastel.bold(home.name)}  #{hg}#{pastel.dim(" - ")}#{ag}  #{pastel.bold(away.name)}"
           out.puts pastel.dim("  λ (expected goals-ish) #{res.home_xg_lambda.round(2)} : #{res.away_xg_lambda.round(2)}")
@@ -305,6 +545,10 @@ module Gaffer
 
           Commands::StartLeague.run(pastel:, out:)
           nil
+        end
+
+        def tactic_label(sym)
+          TACTIC_HEADLINE.fetch(coerce_manager_shape(sym))
         end
       end
     end

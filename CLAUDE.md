@@ -464,11 +464,11 @@ end
 
 | Tactic         | Attack modifier | Defense modifier |
 |----------------|-----------------|------------------|
-| `:all_out_attack` | +15%         | -20%             |
-| `:attacking`   | +8%             | -8%              |
+| `:all_out_attack` | +28%         | −28%             |
+| `:attacking`   | +12%            | −12%             |
 | `:balanced`    | —               | —                |
-| `:defensive`   | -8%             | +8%              |
-| `:park_the_bus`| -20%            | +15%             |
+| `:defensive`   | −12%            | +12%             |
+| `:park_the_bus`| −28%            | +28%             |
 
 ---
 

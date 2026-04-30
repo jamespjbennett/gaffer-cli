@@ -17,7 +17,27 @@ class FixtureDecliningPrompt
   end
 end
 
+class XiAcceptPrompt
+  # Accepts XI prompt; rejects next-season rollover; declines unknown yes/no forks.
+  def yes?(question, *_args)
+    q = question.to_s
+    return false if q.include?("Start Season")
+
+    q.include?("Start with") || q.include?("this XI")
+  end
+
+  def select(*)
+    raise "TTY select not used in this test path"
+  end
+end
+
 describe Gaffer::Commands::NextFixture do
+  def manager_xi_preset
+    @manager_xi_preset ||= Gaffer::Domain::Lineup.pick_best_xi(
+      Gaffer::Repositories::PlayerRepository.for_club(@mgr_club_id)
+    )
+  end
+
   def insert_club(name:, short:)
     Gaffer::Database.db[:clubs].insert(
       name: name,
@@ -88,11 +108,25 @@ describe Gaffer::Commands::NextFixture do
     FileUtils.rm_f(@tmp_path)
   end
 
+  it "shows dugout sheet before XI confirmation when no preset lineup" do
+    log = StringIO.new
+    pastel = Pastel.new
+
+    _(Gaffer::Commands::NextFixture.run(
+      pastel:, out: log, prompt: XiAcceptPrompt.new, manager_tactic: :balanced
+    )).must_equal :ok
+
+    _(log.string).must_match(/Your starting XI/)
+    _(log.string).must_match(/\b4-3-3\b/)
+  end
+
   it "simulates whole gameweek, persists matches, bumps league gw" do
     before_gw = @league.current_gameweek
     pastel = Pastel.new
     log = StringIO.new
-    _(Gaffer::Commands::NextFixture.run(pastel:, out: log, prompt: FixtureDecliningPrompt.new)).must_equal :ok
+    _(Gaffer::Commands::NextFixture.run(
+      pastel:, out: log, prompt: FixtureDecliningPrompt.new, manager_lineup: manager_xi_preset
+    )).must_equal :ok
 
     refreshed = Gaffer::Repositories::LeagueRepository.find(@league.id)
     _(refreshed.current_gameweek).must_equal before_gw + 1
@@ -104,16 +138,34 @@ describe Gaffer::Commands::NextFixture do
     _(refreshed.status).must_equal :active
   end
 
+  it "echoes locked-in tactic wording when manager_tactic is supplied" do
+    log = StringIO.new
+
+    pastel = Pastel.new
+    _(
+      Gaffer::Commands::NextFixture.run(
+        pastel:, out: log, prompt: FixtureDecliningPrompt.new,
+        manager_lineup: manager_xi_preset, manager_tactic: :park_the_bus
+      )
+    ).must_equal :ok
+
+    _(log.string).must_match(/Your shape:.*Park the bus/m)
+  end
+
   it "completes league on final simulated round then offers rollover" do
     prompt = FixtureDecliningPrompt.new
     pastel = Pastel.new
 
     (@max_gw - 1).times do
-      _(Gaffer::Commands::NextFixture.run(pastel:, out: StringIO.new, prompt:)).must_equal :ok
+      _(Gaffer::Commands::NextFixture.run(
+        pastel:, out: StringIO.new, prompt:, manager_lineup: manager_xi_preset
+      )).must_equal :ok
     end
 
     log = StringIO.new
-    _(Gaffer::Commands::NextFixture.run(pastel:, out: log, prompt:)).must_equal :season_completed
+    _(Gaffer::Commands::NextFixture.run(pastel:, out: log, prompt:, manager_lineup: manager_xi_preset)).must_equal(
+      :season_completed
+    )
 
     _(log.string).must_match(/Final standings/)
     _(log.string).must_match(/┌/)
