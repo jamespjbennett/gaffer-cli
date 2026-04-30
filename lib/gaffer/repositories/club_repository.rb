@@ -13,6 +13,11 @@ module Gaffer
           clubs_ds.order(:name).map { row_to_domain(_1) }
         end
 
+        def for_league(league_id)
+          lid = league_id.to_i
+          clubs_ds.where(league_id: lid).order(:name).map { row_to_domain(_1) }
+        end
+
         def save(club)
           attrs = domain_to_attrs(club)
           if club.id

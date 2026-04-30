@@ -6,6 +6,15 @@ module Gaffer
   class CLI < Thor
     map c: :console
 
+    desc "next", "Play the upcoming league gameweek (simulate every fixture in this round)"
+    def next(*)
+      require_relative "../gaffer"
+      require "pastel"
+      require_relative "commands/next_fixture"
+      require "tty-prompt"
+      Gaffer::Commands::NextFixture.run(pastel: Pastel.new, out: $stdout, prompt: TTY::Prompt.new)
+    end
+
     desc "start", "Open the main menu (interactive)"
     def start(*)
       require_relative "ui/menu"

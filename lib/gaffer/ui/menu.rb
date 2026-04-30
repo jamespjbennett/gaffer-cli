@@ -6,6 +6,7 @@ require "tty-prompt"
 
 require_relative "../commands/play_match"
 require_relative "../commands/start_league"
+require_relative "../commands/next_fixture"
 require_relative "onboarding"
 
 module Gaffer
@@ -40,12 +41,18 @@ module Gaffer
           out.puts
 
           choice = prompt.select("What would you like to do?") do |menu|
+            menu.choice "Next fixture · league day", :next_fixture if Repositories::LeagueRepository.active
             menu.choice "Play game", :play
             menu.choice "Start new season", :start_league unless Repositories::LeagueRepository.active
             menu.choice "Quit", :quit
           end
 
           case choice
+          when :next_fixture
+            out.puts
+            Gaffer::Commands::NextFixture.run(pastel:, out: out, prompt: prompt)
+            out.puts
+            prompt.keypress(pastel.dim("Press any key to return to the menu…"))
           when :start_league
             out.puts
             Gaffer::Commands::StartLeague.run(pastel:, out: out)
