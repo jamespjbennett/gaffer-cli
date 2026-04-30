@@ -74,6 +74,18 @@ describe Gaffer::Domain::MatchEngine do
       _(a.to_h).must_equal(b.to_h)
     end
 
+    it "returns scorer lists whose lengths match the scoreline" do
+      (1..40).each do |seed|
+        r = engine.simulate(
+          home_club: strong_club, home_players: strong_team,
+          away_club: weak_club, away_players: weak_team,
+          seed: seed
+        )
+        _(r.home_scorers.size).must_equal r.home_score
+        _(r.away_scorers.size).must_equal r.away_score
+      end
+    end
+
     it "shows higher effective ratings for Crowden-tier inputs than MBW-tier" do
       r = engine.simulate(
         home_club: strong_club, home_players: strong_team,

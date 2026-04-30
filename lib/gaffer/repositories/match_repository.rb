@@ -27,6 +27,17 @@ module Gaffer
           end
         end
 
+        # @param fixture_ids [Array<Integer>]
+        # @return [Hash{Integer => Domain::Match}]
+        def indexed_by_fixture_id(fixture_ids)
+          ids = Array(fixture_ids).map(&:to_i).uniq
+          return {} if ids.empty?
+
+          matches_ds.where(fixture_id: ids).each_with_object({}) do |row, acc|
+            acc[row[:fixture_id]] = row_to_domain(row)
+          end
+        end
+
         private
 
         def matches_ds

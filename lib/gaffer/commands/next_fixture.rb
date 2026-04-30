@@ -152,6 +152,7 @@ module Gaffer
                 managed_club_id:, managed_xi: user_xi
               )
               Repositories::MatchRepository.save(build_match(fixture_id: fx.id, result:))
+              Repositories::GoalEventRepository.save_batch(goal_events_for_fixture(fx, result))
               Repositories::FixtureRepository.save(fixture_played(fx))
               summaries << Summary.new(fixture: fx, result:)
             end
@@ -331,6 +332,29 @@ module Gaffer
           )
         end
 
+        def goal_events_for_fixture(fx, result)
+          hid = fx.home_club_id.to_i
+          aid = fx.away_club_id.to_i
+          fid = fx.id.to_i
+
+          home =
+            result.home_scorers.filter_map do |p|
+              pid = p&.id.to_i
+              next if pid <= 0
+
+              Domain::GoalEvent.new(id: nil, fixture_id: fid, player_id: pid, club_id: hid, side: "home")
+            end
+          away =
+            result.away_scorers.filter_map do |p|
+              pid = p&.id.to_i
+              next if pid <= 0
+
+              Domain::GoalEvent.new(id: nil, fixture_id: fid, player_id: pid, club_id: aid, side: "away")
+            end
+
+          home + away
+        end
+
         def build_match(fixture_id:, result:)
           Domain::Match.new(
             id: nil,
@@ -440,7 +464,10 @@ module Gaffer
           out.puts pastel.dim("─" * SUMMARY_BAR_W)
           out.puts pastel.bold.white("YOUR RESULT")
           if yours
-            print_full_result(out:, pastel:, summary: yours, clubs_by_id:, manager_shape: manager_shape)
+            print_full_result(
+              out:, pastel:, summary: yours, clubs_by_id:, manager_shape: manager_shape,
+              managed_club_id: managed_club_id
+            )
           else
             out.puts pastel.red("Could not locate your club in this round — data mismatch.")
           end
@@ -481,7 +508,7 @@ module Gaffer
           end
         end
 
-        def print_full_result(out:, pastel:, summary:, clubs_by_id:, manager_shape: :balanced)
+        def print_full_result(out:, pastel:, summary:, clubs_by_id:, manager_shape: :balanced, managed_club_id:)
           fx = summary.fixture
           res = summary.result
           home = clubs_by_id[fx.home_club_id]
@@ -493,7 +520,24 @@ module Gaffer
           out.puts pastel.dim("Your shape: #{label}")
           out.puts pastel.dim("#{home.name} vs #{away.name}")
           out.puts "  #{pastel.bold(home.name)}  #{hg}#{pastel.dim(" - ")}#{ag}  #{pastel.bold(away.name)}"
+
+          mid = managed_club_id.to_i
+          hid = fx.home_club_id.to_i
+          aid = fx.away_club_id.to_i
+          home_hi = mid.positive? && hid == mid
+          away_hi = mid.positive? && aid == mid
+          home_cell = scorer_names_cell(pastel, res.home_scorers, home_hi)
+          away_cell = scorer_names_cell(pastel, res.away_scorers, away_hi)
+          out.puts "  #{home_cell}#{pastel.dim("  vs  ")}#{away_cell}"
+
           out.puts pastel.dim("  λ (expected goals-ish) #{res.home_xg_lambda.round(2)} : #{res.away_xg_lambda.round(2)}")
+        end
+
+        def scorer_names_cell(pastel, players, highlight)
+          return pastel.dim("—") if players.nil? || players.empty?
+
+          text = players.map { |p| p.name.to_s.strip }.join(", ")
+          highlight ? pastel.bold(text) : pastel.dim(text)
         end
 
         def format_scoreline(summary, clubs_by_id)

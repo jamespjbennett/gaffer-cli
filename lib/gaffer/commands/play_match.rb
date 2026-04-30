@@ -107,6 +107,15 @@ module Gaffer
           ag = pastel.bold.green(result.away_score.to_s.rjust(2))
 
           out.puts "  #{pastel.bold(home.name)}  #{hg}#{pastel.dim(" - ")}#{ag}  #{pastel.bold(away.name)}"
+          hs = result.home_scorers.map(&:name).join(", ")
+          aws = result.away_scorers.map(&:name).join(", ")
+          sc_line =
+            if hs.empty? && aws.empty?
+              pastel.dim("  —  vs  —")
+            else
+              "  #{pastel.dim(hs.empty? ? "—" : hs)}#{pastel.dim("  vs  ")}#{pastel.dim(aws.empty? ? "—" : aws)}"
+            end
+          out.puts sc_line
           out.puts pastel.dim("  λ (expected goals-ish) #{result.home_xg_lambda.round(2)} : #{result.away_xg_lambda.round(2)}")
           out.puts pastel.dim("─" * line_w)
         end

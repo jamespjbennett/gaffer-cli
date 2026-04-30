@@ -82,6 +82,14 @@ module Gaffer
           end
         end
 
+        # Fixtures in `season_id` with optional match rows (nil if unplayed or missing match row).
+        # @return [Array<Array(Domain::Fixture, Domain::Match, nil)>]
+        def fixtures_with_matches_for_season(season_id)
+          fxs = for_season(season_id)
+          by_fx = Repositories::MatchRepository.indexed_by_fixture_id(fxs.map(&:id))
+          fxs.map { |fx| [fx, fx.played? ? by_fx[fx.id] : nil] }
+        end
+
         # Clubs that took part in `season_id`, derived from fixtures (works for archived leagues once
         # `clubs.league_id` has moved on to a newer season row).
         def club_ids_for_season(season_id)

@@ -2,7 +2,7 @@
 
 module Gaffer
   module Domain
-    # Lightweight outcome from MatchEngine — no scorer detail yet.
+    # Outcome from MatchEngine: scoreline, λ diagnostics, and sampled goal scorers per side.
     MatchResult = Data.define(
       :home_score,
       :away_score,
@@ -11,7 +11,9 @@ module Gaffer
       :home_attack_rating,
       :home_defense_rating,
       :away_attack_rating,
-      :away_defense_rating
+      :away_defense_rating,
+      :home_scorers,
+      :away_scorers
     )
   end
 end

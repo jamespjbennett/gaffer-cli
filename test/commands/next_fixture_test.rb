@@ -136,6 +136,10 @@ describe Gaffer::Commands::NextFixture do
     _(log.string).must_match(/Gameweek 1/)
 
     _(refreshed.status).must_equal :active
+
+    match_rows = Gaffer::Database.db[:matches].all
+    goals_from_scores = match_rows.sum { |row| row[:home_score].to_i + row[:away_score].to_i }
+    _(Gaffer::Database.db[:goal_events].count).must_equal goals_from_scores
   end
 
   it "echoes locked-in tactic wording when manager_tactic is supplied" do

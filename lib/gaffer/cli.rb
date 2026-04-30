@@ -28,6 +28,50 @@ module Gaffer
       )
     end
 
+    desc "fixtures", "Fixtures & results — active league; use --previous or --year for archives"
+    method_option :previous, type: :boolean, default: false, aliases: "-p",
+                  desc: "Show the newest completed league"
+    method_option :year, type: :numeric,
+                  banner: "YEAR",
+                  desc: "Show fixtures for the most recent league with this calendar year"
+    def fixtures(*)
+      require_relative "../gaffer"
+      require "pastel"
+      require_relative "commands/season_fixtures"
+
+      yr = options[:year]
+      yr = Integer(yr) unless yr.nil?
+
+      Gaffer::Commands::SeasonFixtures.run(
+        pastel: Pastel.new,
+        out: $stdout,
+        previous: options[:previous],
+        year: yr
+      )
+    end
+
+    desc "scorers", "Top scorers — active league by default; use --previous or --year for archives"
+    method_option :previous, type: :boolean, default: false, aliases: "-p",
+                  desc: "Show the newest completed league"
+    method_option :year, type: :numeric,
+                  banner: "YEAR",
+                  desc: "Show scorers for the most recent league with this calendar year"
+    def scorers(*)
+      require_relative "../gaffer"
+      require "pastel"
+      require_relative "commands/top_scorers"
+
+      yr = options[:year]
+      yr = Integer(yr) unless yr.nil?
+
+      Gaffer::Commands::TopScorers.run(
+        pastel: Pastel.new,
+        out: $stdout,
+        previous: options[:previous],
+        year: yr
+      )
+    end
+
     desc "next", "Play the upcoming league gameweek (simulate every fixture in this round)"
     def next(*)
       require_relative "../gaffer"

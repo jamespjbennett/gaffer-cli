@@ -3,6 +3,7 @@
 require_relative "club"
 require_relative "player"
 require_relative "match_result"
+require_relative "scorer_picker"
 
 module Gaffer
   module Domain
@@ -57,15 +58,20 @@ module Gaffer
         lam_home = lambda_goals_from_strength(home_attack, away_defense, home_advantage: true, rng:)
         lam_away = lambda_goals_from_strength(away_attack, home_defense, home_advantage: false, rng:)
 
+        home_goals = sample_poisson_goals(lam_home, rng)
+        away_goals = sample_poisson_goals(lam_away, rng)
+
         MatchResult.new(
-          home_score: sample_poisson_goals(lam_home, rng),
-          away_score: sample_poisson_goals(lam_away, rng),
+          home_score: home_goals,
+          away_score: away_goals,
           home_xg_lambda: lam_home,
           away_xg_lambda: lam_away,
           home_attack_rating: home_attack,
           home_defense_rating: home_defense,
           away_attack_rating: away_attack,
-          away_defense_rating: away_defense
+          away_defense_rating: away_defense,
+          home_scorers: Domain::ScorerPicker.pick(home_players, home_goals, rng),
+          away_scorers: Domain::ScorerPicker.pick(away_players, away_goals, rng)
         )
       end
 

@@ -8,6 +8,8 @@ require_relative "../commands/play_match"
 require_relative "../commands/start_league"
 require_relative "../commands/next_fixture"
 require_relative "../commands/league_standings"
+require_relative "../commands/season_fixtures"
+require_relative "../commands/top_scorers"
 require_relative "onboarding"
 
 module Gaffer
@@ -46,7 +48,10 @@ module Gaffer
           choice = prompt.select("What would you like to do?") do |menu|
             menu.choice "Next fixture · league day", :next_fixture if Repositories::LeagueRepository.active
             menu.choice "League table", :league_table if Repositories::LeagueRepository.active
+            menu.choice "Fixtures & results", :season_fixtures if Repositories::LeagueRepository.active
+            menu.choice "Top scorers", :top_scorers if Repositories::LeagueRepository.active
             menu.choice "Archived league table…", :archived_league_table unless completed_rows.empty?
+            menu.choice "Archived fixtures…", :archived_season_fixtures unless completed_rows.empty?
             menu.choice "Play game", :play
             menu.choice "Start new season", :start_league unless Repositories::LeagueRepository.active
             menu.choice "Quit", :quit
@@ -76,6 +81,31 @@ module Gaffer
           when :league_table
             out.puts
             Gaffer::Commands::LeagueStandings.run(pastel:, out: out)
+            out.puts
+            prompt.keypress(pastel.dim("Press any key to return to the menu…"))
+          when :season_fixtures
+            out.puts
+            Gaffer::Commands::SeasonFixtures.run(pastel:, out: out)
+            out.puts
+            prompt.keypress(pastel.dim("Press any key to return to the menu…"))
+          when :top_scorers
+            out.puts
+            Gaffer::Commands::TopScorers.run(pastel:, out: out)
+            out.puts
+            prompt.keypress(pastel.dim("Press any key to return to the menu…"))
+          when :archived_season_fixtures
+            out.puts
+            archived_choices =
+              Repositories::LeagueRepository.completed_ordered.map do |lg|
+                { name: "#{lg.year} · #{lg.name}", value: lg }
+              end
+
+            sel = prompt.select(
+              pastel.bold("Fixtures for which season?"),
+              archived_choices,
+              filter: true
+            )
+            Gaffer::Commands::SeasonFixtures.run(pastel:, out:, league: sel)
             out.puts
             prompt.keypress(pastel.dim("Press any key to return to the menu…"))
           when :start_league
