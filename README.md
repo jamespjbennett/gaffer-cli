@@ -17,9 +17,11 @@ bundle install
 bundle exec rake db:seed
 ```
 
-`db:seed` runs migrations first, then inserts two fictional clubs (**Crowden Rovers**, short `CRW`) and (**Millbrook Wanderers**, short `MBW`), each with 23 players — **Crowden’s squad is rated noticeably higher** so home/away simulations favour them.
+First launch of `./bin/gaffer` runs **migrations** automatically, then asks you to **pick a manager name** and **which seeded club you manage** (stored in the `managers` table). Clearing the SQLite file or switching `GAFFER_DB_PATH` resets that choice.
 
-Re-running is safe only when **both** exist: seed skips if `CRW` **and** `MBW` are already present. If you previously seeded the old Manchester United data or only one club, **use a new SQLite file** (or delete `db/gaffer.sqlite`) before seeding again.
+`db:seed` runs migrations first, then inserts five fictional clubs of **different strengths** (short codes `CRW` → `AHU` → `RCT` → `FAB` → `MBW`, roughly strongest to weakest): **Crowden Rovers**, **Ashton Heath United**, **Riverside Town**, **Fenbury Athletic**, and **Millbrook Wanderers**, each with **23 players** plus club reputation, budget, and stadium.
+
+Re-running skips if **all five** short codes already exist. If you have a partial seed or old dev data from an earlier checkout, delete `db/gaffer.sqlite` or point `GAFFER_DB_PATH` at a new file before seeding again.
 
 By default the SQLite file is `db/gaffer.sqlite` (the directory is created if needed). Override with:
 

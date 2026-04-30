@@ -98,10 +98,15 @@ gaffer/
 │   ├── domain/                 # Pure domain objects — no AI, no I/O
 │   │   ├── club.rb
 │   │   ├── player.rb
+│   │   ├── player_availability.rb  # Injury/suspension status per gameweek
 │   │   ├── league.rb
 │   │   ├── fixture.rb
 │   │   ├── match.rb
-│   │   ├── match_engine.rb     # Deterministic simulation core
+│   │   ├── match_engine.rb         # Deterministic simulation core
+│   │   ├── match_selection.rb      # Chosen XI + tactic for a fixture
+│   │   ├── save.rb                 # Root of a game state (manager + club + season)
+│   │   ├── manager.rb              # Manager name, club, save
+│   │   ├── scout_report.rb         # Derived opponent summary (template-based)
 │   │   ├── season.rb
 │   │   ├── transfer_market.rb
 │   │   └── tactics.rb
@@ -115,12 +120,15 @@ gaffer/
 │   ├── presenters/             # TTY rendering layer
 │   │   ├── league_table.rb
 │   │   ├── match_report.rb
+│   │   ├── squad_selector.rb       # Interactive XI picker
+│   │   ├── scout_report.rb         # Opponent lowdown display
 │   │   ├── squad_view.rb
 │   │   └── dashboard.rb
 │   │
 │   └── commands/               # One file per CLI command
-│       ├── new_game.rb
-│       ├── play_match.rb
+│       ├── new_game.rb             # Save setup: name → league → club
+│       ├── next_fixture.rb         # Scout → pick team → play
+│       ├── play_match.rb           # Match simulation + result display
 │       ├── manage_squad.rb
 │       ├── transfer_window.rb
 │       └── press_conference.rb
@@ -275,6 +283,122 @@ Season {
   current_gw:   Integer
   status:       Enum[:pre_season, :active, :complete]
 }
+```
+
+---
+
+### Save & Manager
+
+```ruby
+Save {
+  id:           Integer
+  manager_name: String
+  club_id:      Integer
+  season_id:    Integer
+  created_at:   DateTime
+}
+
+Manager {
+  id:      Integer
+  name:    String
+  save_id: Integer
+  club_id: Integer
+}
+```
+
+A `Save` is the root of a game state. Everything — fixtures, results, squad changes — hangs off a save. Multiple saves are supported but only one is active at a time.
+
+---
+
+### MatchSelection
+
+The player's chosen XI and tactic for a specific fixture, persisted so past decisions are reviewable.
+
+```ruby
+MatchSelection {
+  id:          Integer
+  fixture_id:  Integer
+  save_id:     Integer
+  tactic:      Enum[:all_out_attack, :attacking, :balanced, :defensive, :park_the_bus]
+  player_ids:  JSON    # ordered array of 11 player IDs [GK, DEF x4, MID x3, ATT x3]
+  confirmed:   Boolean
+}
+```
+
+---
+
+### PlayerAvailability
+
+Tracks injury and suspension state per player per gameweek. Absence is the exception — a missing row means the player is available.
+
+```ruby
+PlayerAvailability {
+  id:          Integer
+  player_id:   Integer
+  save_id:     Integer
+  gameweek:    Integer
+  status:      Enum[:injured, :suspended]
+  return_gw:   Integer   # gameweek they become available again
+}
+```
+
+Injury logic: after each match, each outfield player has a 7% chance of picking up a knock (1–3 gameweeks out). GKs 4%. Suspensions triggered at 5 yellows or a red card.
+
+---
+
+### ScoutReport
+
+A derived value object — not persisted, computed fresh before each fixture from the opponent's current squad data.
+
+```ruby
+ScoutReport {
+  opponent:         Club
+  overall_rating:   Integer          # avg overall of their best XI
+  strengths:        Array<String>    # e.g. ["Dangerous from set pieces", "Strong GK"]
+  weaknesses:       Array<String>    # e.g. ["Slow fullbacks", "Poor aerial defending"]
+  likely_tactic:    Symbol           # inferred from club reputation + recent form
+  key_players:      Array<Player>    # top 3 by overall
+  recent_form:      Array<Symbol>    # last 5 results e.g. [:w, :w, :d, :l, :w]
+}
+```
+
+Scout report generation is purely template-based (no AI). Strengths and weaknesses are derived from attribute comparisons against league averages:
+
+```ruby
+module Gaffer
+  class ScoutReportBuilder
+    THRESHOLDS = {
+      pace_threat:      { attribute: :pace,       position: :att, threshold: 78 },
+      aerial_strength:  { attribute: :physical,   position: :def, threshold: 75 },
+      creative_mid:     { attribute: :passing,    position: :mid, threshold: 76 },
+      weak_fullbacks:   { attribute: :defending,  position: :def, threshold: 62 },
+      strong_gk:        { attribute: :goalkeeping,position: :gk,  threshold: 76 }
+    }
+
+    def build(opponent_squad)
+      strengths  = []
+      weaknesses = []
+
+      THRESHOLDS.each do |trait, config|
+        avg = positional_avg(opponent_squad, config[:position], config[:attribute])
+        if avg >= config[:threshold]
+          strengths << trait_label(trait, :strength)
+        elsif avg <= config[:threshold] - 14
+          weaknesses << trait_label(trait, :weakness)
+        end
+      end
+
+      ScoutReport.new(
+        overall_rating: best_xi_avg(opponent_squad),
+        strengths:,
+        weaknesses:,
+        likely_tactic: infer_tactic(opponent_squad),
+        key_players: top_players(opponent_squad, 3),
+        recent_form: recent_form(opponent_squad)
+      )
+    end
+  end
+end
 ```
 
 ---
@@ -495,15 +619,79 @@ lib/gaffer/prompts/
 ## CLI Commands
 
 ```bash
-gaffer new          # Start a new save: pick league, club, difficulty
-gaffer play         # Play next fixture (simulates + narrates)
-gaffer squad        # View and manage your squad
+gaffer new          # Create a new save
+gaffer next         # Play your next fixture (main game loop)
+gaffer squad        # View current squad + availability
 gaffer table        # Current league standings
-gaffer fixtures     # Upcoming and recent fixtures
+gaffer fixtures     # Full fixture list with results
+gaffer season       # Season overview: form, board mood, targets
 gaffer transfers    # Open transfer market (in window)
 gaffer press        # Trigger a press conference (uses AI)
-gaffer season       # Season overview: form, board mood, targets
 gaffer config       # Manage API key and settings
+```
+
+---
+
+## Core Game Flow
+
+### `gaffer new` — New Save
+
+```
+1. Enter your manager name
+2. Pick a league           (TTY select list)
+3. Pick a club             (TTY select list, shows reputation + board target)
+4. Season fixtures generated automatically (round-robin home/away)
+5. Confirmation screen:
+   ─────────────────────────────────────────
+   Welcome, [Name].
+   You've taken charge of [Club].
+   The board expect: [target].
+   First fixture: [Opponent] — Gameweek 1
+   ─────────────────────────────────────────
+```
+
+---
+
+### `gaffer next` — Next Fixture (main loop)
+
+```
+Step 1 — Fixture header
+  "Gameweek 12 · Home · Arsenal vs Chelsea"
+  Current league position + last 5 form
+
+Step 2 — Scout report
+  Opponent overall rating
+  Key strengths (2–3 bullet points)
+  Key weaknesses (2–3 bullet points)
+  Likely tactic
+  Players to watch (top 3 by overall)
+
+Step 3 — Squad selection
+  Suggested best XI shown (highest available overall by position)
+  Player shows: name / position / overall / form / availability
+  Prompt: "Accept this lineup? [Y/n]"
+  If no → interactive swap: pick position to change → pick replacement from available squad
+
+Step 4 — Tactic selection
+  Select from: All Out Attack / Attacking / Balanced / Defensive / Park the Bus
+  Brief description of each shown inline
+
+Step 5 — Confirmation
+  Final XI displayed in formation shape
+  Tactic shown
+  "Ready? [Enter to kick off]"
+
+Step 6 — Match
+  Simulates via MatchEngine
+  Key events printed as they "happen" (with short sleep between for effect)
+  e.g. "⚽ 23' — Saka fires past the keeper. Arsenal 1–0 Chelsea"
+       "🟨 45' — Gallagher booked for a late challenge"
+
+Step 7 — Full time
+  Final score + match stats (possession, shots, shots on target)
+  Player ratings table
+  Updated league table snippet (your club ± 2 positions either side)
+  "Press [Enter] for next fixture"
 ```
 
 ---
@@ -627,12 +815,21 @@ puts "Smoke test passed."
 ## Development Phases
 
 ### Phase 1 — Playable Core (no AI)
-- [ ] Domain models: Player, Club, League, Fixture, Season
+- [ ] Domain models: Player, Club, League, Fixture, Season, Save, Manager
+- [ ] Domain models: MatchSelection, PlayerAvailability, ScoutReport
 - [ ] SQLite schema + migrations
-- [ ] Seed data: Premier League
+- [ ] Seed data: Premier League (20 clubs, ~500 players)
+- [ ] `gaffer new` — name → league → club → save created → fixtures generated
+- [ ] `gaffer next` — scout report → squad selection → tactic → simulate → result
+- [ ] `gaffer table` — league standings
+- [ ] `gaffer squad` — squad list with availability
+- [ ] `gaffer fixtures` — fixture list with results
 - [ ] Match engine: simulate() with Poisson goal sampling
-- [ ] CLI game loop: `new`, `play`, `table`, `squad`
-- [ ] Template narrator fallback
+- [ ] ScoutReportBuilder: template-based strengths/weaknesses from squad attributes
+- [ ] Best XI suggestion: highest available overall by position
+- [ ] Interactive XI swap via TTY prompt
+- [ ] Injury system: post-match random knock generation
+- [ ] Template narrator fallback (no AI needed)
 
 ### Phase 2 — AI Narrative Layer
 - [ ] Anthropic client + Claude narrator

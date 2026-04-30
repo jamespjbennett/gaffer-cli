@@ -10,6 +10,7 @@ gem "sequel"
 gem "sqlite3"
 gem "thor"
 gem "tty-box"
+gem "tty-font", "~> 0.5"
 gem "tty-prompt"
 gem "tty-table"
 

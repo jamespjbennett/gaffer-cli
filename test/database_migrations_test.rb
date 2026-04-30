@@ -24,8 +24,11 @@ describe "database migrations" do
   end
 
   it "creates clubs, players, fixtures, matches tables with expected columns" do
-    _(Gaffer::Database.db.tables.sort).must_equal(%i[clubs fixtures matches players schema_info].sort)
+    _(Gaffer::Database.db.tables.sort).must_equal(%i[clubs fixtures managers matches players schema_info].sort)
 
+    manager_columns = Gaffer::Database.db[:managers].columns
+    _(manager_columns).must_include(:display_name)
+    _(manager_columns).must_include(:managed_club_id)
     club_columns = Gaffer::Database.db[:clubs].columns
     _(club_columns).must_include(:name)
     _(club_columns).must_include(:short_name)

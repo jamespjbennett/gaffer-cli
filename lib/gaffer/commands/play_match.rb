@@ -4,36 +4,48 @@ require "pastel"
 
 module Gaffer
   module Commands
-    # Friendly: Crowden Rovers (home) vs Millbrook Wanderers (away) — requires `rake db:seed`.
+    # Friendly at your stadium: managed club hosts a classic foil opponent (CRW ⇄ MBW).
     module PlayMatch
       module_function
 
-      HOME_SHORT = "CRW"
-      AWAY_SHORT = "MBW"
+      # Fixed pair from the seeded five — keeps matchups plausible while we wait on fixtures.
+      def foil_short(manager_short_name)
+        manager_short_name.to_s.casecmp?("MBW") ? "CRW" : "MBW"
+      end
 
       def run(pastel: Pastel.new, out: $stdout)
         Gaffer::Database.connect
 
-        home_row = Gaffer::Database.db[:clubs].where(short_name: HOME_SHORT).first
-        away_row = Gaffer::Database.db[:clubs].where(short_name: AWAY_SHORT).first
-        unless home_row && away_row
-          out.puts pastel.red("Could not find seeded clubs #{HOME_SHORT} (home) and #{AWAY_SHORT} (away).")
-          out.puts pastel.dim("Run: bundle exec rake db:seed")
+        mgr = Repositories::ManagerRepository.current
+        unless mgr&.managed_club_id
+          out.puts pastel.red("No manager profile loaded — restart and complete onboarding.")
           return
         end
 
-        home = Gaffer::Repositories::ClubRepository.find(home_row[:id])
-        away = Gaffer::Repositories::ClubRepository.find(away_row[:id])
+        home = Repositories::ClubRepository.find(mgr.managed_club_id)
+        unless home
+          out.puts pastel.red("Your managed club vanished from the database.")
+          return
+        end
 
-        home_players = Gaffer::Repositories::PlayerRepository.for_club(home.id)
-        away_players = Gaffer::Repositories::PlayerRepository.for_club(away.id)
+        away_sn = foil_short(home.short_name)
+        away_row = Gaffer::Database.db[:clubs].where(short_name: away_sn.upcase).first
+        unless away_row
+          out.puts pastel.red("Could not find foil club #{away_sn.inspect} — run rake db:seed.")
+          return
+        end
+
+        away = Repositories::ClubRepository.find(away_row[:id])
+
+        home_players = Repositories::PlayerRepository.for_club(home.id)
+        away_players = Repositories::PlayerRepository.for_club(away.id)
 
         if home_players.empty? || away_players.empty?
           out.puts pastel.red("One club has no squad in the database.")
           return
         end
 
-        result = Gaffer::Domain::MatchEngine.new.simulate(
+        result = Domain::MatchEngine.new.simulate(
           home_club: home,
           home_players: home_players,
           away_club: away,
@@ -42,8 +54,12 @@ module Gaffer
           away_tactic: :balanced
         )
 
-        out.puts pastel.dim("─" * 52)
-        out.puts pastel.bold.white("MATCH RESULT · friendly · full time")
+        line_w = [52, "#{home.name} #{away.name}".length + 28].max
+
+        out.puts pastel.dim("─" * line_w)
+        ft = pastel.dim("friendly · #{away.name} rolling into town · full time")
+        out.puts pastel.bold.white("MATCH RESULT")
+        out.puts ft
         out.puts
 
         hg = pastel.bold.green(result.home_score.to_s.rjust(2))
@@ -51,7 +67,7 @@ module Gaffer
 
         out.puts "  #{pastel.bold(home.name)}  #{hg}#{pastel.dim(" - ")}#{ag}  #{pastel.bold(away.name)}"
         out.puts pastel.dim("  λ (expected goals-ish) #{result.home_xg_lambda.round(2)} : #{result.away_xg_lambda.round(2)}")
-        out.puts pastel.dim("─" * 52)
+        out.puts pastel.dim("─" * line_w)
       end
     end
   end
