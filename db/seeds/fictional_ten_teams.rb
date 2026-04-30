@@ -1,8 +1,6 @@
 # frozen_string_literal: true
 
-# Five fictional clubs at different strength tiers (make-believe names & venues).
-# Strongest tier is closest to Crowden-style ratings; weakest to Millbrook-style.
-#
+# Ten fictional clubs in five loosely paired tiers (similar strength pairs top → bottom).
 # bundle exec rake db:seed
 
 Gaffer::Database.connect
@@ -12,44 +10,80 @@ ClubRepo = Gaffer::Repositories::ClubRepository
 PlayerRepo = Gaffer::Repositories::PlayerRepository
 Domain = Gaffer::Domain
 
-# Canonical short codes in quality order (1 = strongest approximate tier).
-EXPECTED_SHORTS = %w[CRW AHU RCT FAB MBW].freeze
+# Canonical short codes in descending quality order.
+EXPECTED_SHORTS = %w[CRW STB KLF VPK AHU RCT FAB LAN HCY MBW].freeze
 
-# tier 1=highest baseline skill drift; tier 5=lowest
-TIER_OVR_CENTER = [78, 70, 64, 58, 51].freeze
+# Squad baseline per tier — pairs are close neighbours (tier 2 nudges slightly under tier 1, etc.).
+TIER_OVR_CENTER = [76, 74, 70, 68, 64, 62, 57, 55, 51, 49].freeze
 
 TEAMS = [
   {
     short: "CRW",
     name: "Crowden Rovers FC",
     tier: 1,
-    reputation: 88,
-    budget: 150_000,
-    wage_budget: 5000,
+    reputation: 86,
+    budget: 140_000,
+    wage_budget: 4800,
     stadium: "Crowden Moor",
     chairman_name: "H. Calder",
-    chairman_mood: :satisfied,
+    chairman_mood: :delighted,
     board_target: :europe
   },
   {
-    short: "AHU",
-    name: "Ashton Heath United",
+    short: "STB",
+    name: "Staverton Borough",
     tier: 2,
-    reputation: 78,
-    budget: 72_000,
-    wage_budget: 2800,
-    stadium: "Heath Lane",
-    chairman_name: "M. Briggs",
+    reputation: 81,
+    budget: 95_000,
+    wage_budget: 3200,
+    stadium: "Borough Park",
+    chairman_name: "G. Stavely",
     chairman_mood: :satisfied,
     board_target: :top_half
   },
   {
+    short: "KLF",
+    name: "Kettleford Town",
+    tier: 3,
+    reputation: 74,
+    budget: 58_000,
+    wage_budget: 2100,
+    stadium: "Kettleford Road",
+    chairman_name: "E. Kettle",
+    chairman_mood: :satisfied,
+    board_target: :top_half
+  },
+  {
+    short: "VPK",
+    name: "Vale Park Athletic",
+    tier: 4,
+    reputation: 72,
+    budget: 48_000,
+    wage_budget: 1750,
+    stadium: "Vale Park",
+    chairman_name: "N. Pemberton",
+    chairman_mood: :okay,
+    board_target: :mid_table
+  },
+  {
+    short: "AHU",
+    name: "Ashton Heath United",
+    tier: 5,
+    reputation: 69,
+    budget: 38_000,
+    wage_budget: 1380,
+    stadium: "Heath Lane",
+    chairman_name: "M. Briggs",
+    chairman_mood: :okay,
+    board_target: :mid_table
+  },
+  {
     short: "RCT",
     name: "Riverside Town",
-    tier: 3,
-    reputation: 70,
-    budget: 35_000,
-    wage_budget: 1200,
+    tier: 6,
+    reputation: 67,
+    budget: 32_000,
+    wage_budget: 1180,
     stadium: "Riverside Park",
     chairman_name: "P. Lowell",
     chairman_mood: :okay,
@@ -58,22 +92,46 @@ TEAMS = [
   {
     short: "FAB",
     name: "Fenbury Athletic",
-    tier: 4,
-    reputation: 63,
-    budget: 16_500,
-    wage_budget: 580,
+    tier: 7,
+    reputation: 61,
+    budget: 18_000,
+    wage_budget: 650,
     stadium: "Fenbury Meadow",
     chairman_name: "L. Wynne",
     chairman_mood: :concerned,
     board_target: :avoid_relegation
   },
   {
+    short: "LAN",
+    name: "Langford United",
+    tier: 8,
+    reputation: 58,
+    budget: 14_500,
+    wage_budget: 520,
+    stadium: "Langbrook Bank",
+    chairman_name: "J. Calderwood",
+    chairman_mood: :concerned,
+    board_target: :avoid_relegation
+  },
+  {
+    short: "HCY",
+    name: "Hartwell City",
+    tier: 9,
+    reputation: 53,
+    budget: 10_200,
+    wage_budget: 410,
+    stadium: "Hartwell Crescent",
+    chairman_name: "S. Briggs",
+    chairman_mood: :concerned,
+    board_target: :avoid_relegation
+  },
+  {
     short: "MBW",
     name: "Millbrook Wanderers",
-    tier: 5,
-    reputation: 56,
-    budget: 8500,
-    wage_budget: 380,
+    tier: 10,
+    reputation: 50,
+    budget: 8800,
+    wage_budget: 360,
     stadium: "River End Ground",
     chairman_name: "R. Finch",
     chairman_mood: :concerned,
@@ -86,7 +144,7 @@ FIRST_NAMES = %w[
 ].freeze
 
 SURNAMES = %w[
-  Norwood Brooks Hart Silveira Kerr Duarte Vale Novak Dahl Larsson Pace Morgan Reed Shaw Wells Finn Croft Dale Marsh Young Bishop Cole Hale Price Romano Sokolov Finch Touré Mahmoud Cantu Reese Klein Orchard Hahn Reese Pike Graf Calder Brennan Hart Lang Sund Morley Duval Graf Okoro Graf Rhys Moss Venn Boone Correa Cairns
+  Norwood Brooks Hart Silveira Kerr Duarte Vale Novak Dahl Larsson Pace Morgan Reed Shaw Wells Finn Croft Dale Marsh Young Bishop Cole Hale Price Romano Sokolov Finch Touré Mahmoud Cantu Reese Klein Orchard Hahn Reese Pike Graf Calder Brennan Hart Lang Sund Morley Duval Graf Okoro Graf Rhys Moss Venn Boone Correa Cairns Stavely Pemberton Kettle Briggs Calderwood
 ].freeze
 
 NATIONS = %w[ENG SCO WAL IRL GER FRA ESP POR NED SWE NOR CZE POL BRA USA AUS BEL ITA ARG NGA MLI GER CRO AUT].freeze
@@ -94,7 +152,6 @@ NATIONS = %w[ENG SCO WAL IRL GER FRA ESP POR NED SWE NOR CZE POL BRA USA AUS BEL
 POSITION_SKELETON = (([:gk] * 3) + ([:def] * 7) + ([:mid] * 7) + ([:att] * 6)).freeze
 
 def seeded_rng(team_short, lineup_index)
-  # Deterministic-but-noisy RNG per squad slot so every run yields identical saves.
   seed_val = ("#{team_short}:#{lineup_index}".hash % 2_147_483_647)
   Random.new(seed_val)
 end
@@ -103,19 +160,19 @@ def build_player(team_short:, tier:, position:, lineup_index:)
   tier_idx = tier - 1
   center = TIER_OVR_CENTER[tier_idx]
   rng = seeded_rng(team_short, lineup_index)
-  drift = rng.rand(-6..7) + ((lineup_index % 11) / 4) # XI slightly above bench noise
+  drift = rng.rand(-6..7) + ((lineup_index % 11) / 4)
   base = center + drift
   lvl = base.clamp(38, 93)
 
   name = "#{FIRST_NAMES[lineup_index % FIRST_NAMES.size]} #{SURNAMES[(lineup_index * 17 + tier_idx * 31) % SURNAMES.size]}"
   nat = NATIONS[lineup_index % NATIONS.size]
-  age = rng.rand((tier <= 2 ? 18 : 17)..(tier <= 2 ? 33 : 35))
+  age = rng.rand((tier <= 4 ? 18 : 17)..(tier <= 4 ? 34 : 35))
   years = rng.rand(1..4)
-  wage = rng.rand((tier <= 2 ? 4 : 1)..(tier * 42 + rng.rand(-3..28)))
-  wage = wage.clamp(1, tier * 60 + 20)
-  form = rng.rand((tier <= 2 ? 5 : 4)..8)
+  wage = rng.rand((tier <= 5 ? 3 : 1)..(tier * 24 + rng.rand(-3..38)))
+  wage = wage.clamp(1, tier * 40 + 30)
+  form = rng.rand((tier <= 5 ? 5 : 4)..8)
   morale = [:okay, :happy, :unsettled, :okay, :okay].sample(random: rng)
-  pot_delta = rng.rand((tier <= 3 ? 3 : 2)..12)
+  pot_delta = rng.rand((tier <= 7 ? 2 : 1)..12)
 
   pace = (lvl + rng.rand(-10..14)).clamp(28, 95)
   phys = (lvl + rng.rand(-6..14)).clamp(28, 95)
@@ -173,7 +230,6 @@ def build_player(team_short:, tier:, position:, lineup_index:)
 end
 
 def compute_overall_flat(pos, pace, sho, pas, drib, defn, phys, gkk)
-  # Rough single-number parity with handwritten seeds — match engine ignores this field anyway.
   u = pace + sho + pas + drib + defn + phys + (pos == :gk ? gkk * 4 : gkk / 10)
   (u / 7.15).to_i.clamp(40, 95)
 end
@@ -209,7 +265,7 @@ existing = clubs_ds.where(short_name: EXPECTED_SHORTS.to_a).select_map(:short_na
 already_all = EXPECTED_SHORTS.all? { |code| existing.include?(code) }
 
 if already_all
-  $stderr.puts "Seed skipped: all five fictional clubs #{EXPECTED_SHORTS.join(", ")} already exist."
+  $stderr.puts "Seed skipped: all #{TEAMS.size} fictional clubs #{EXPECTED_SHORTS.join(", ")} already exist."
 elsif existing.any?
   $stderr.puts <<-MSG
 
@@ -247,12 +303,12 @@ else
     end
 
     saved = persist_players.call(club, rows)
-    tier_label = "#{team.fetch(:tier)} / #{TEAMS.size}"
+    pair = ((team.fetch(:tier) - 1) / 2) + 1
     $stderr.puts(
-      "Seeded #{club.short_name}: #{club.name} — tier #{tier_label} (~#{team.fetch(:reputation)} rep, " \
-      "#{saved.size} players)."
+      "Seeded #{club.short_name}: #{club.name} — tier #{team.fetch(:tier)} " \
+      "(pair #{pair}/5, ~#{team.fetch(:reputation)} rep, #{saved.size} players)."
     )
   end
 
-  $stderr.puts "Five clubs seeded ( #{EXPECTED_SHORTS.join(" → ")} quality spread ) — fixtures/league wiring next."
+  $stderr.puts "Ten clubs seeded (five loosely paired tiers, #{EXPECTED_SHORTS.first} → #{EXPECTED_SHORTS.last} spread)."
 end

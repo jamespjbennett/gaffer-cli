@@ -217,28 +217,32 @@ Club {
 
 ### League
 
+A League **is** a season. Each calendar year has a new League row. There is no separate Season model — the League carries year, status, and the current gameweek pointer. Clubs reference the active League via `league_id`; when a new season starts, a new League row is created and all clubs are re-linked to it.
+
 ```ruby
 League {
-  id:           Integer
-  name:         String
-  country:      String
-  tier:         Integer
-  club_ids:     Array<Integer>
+  id:               Integer
+  name:             String            # e.g. "Fictional League One"
+  year:             Integer           # 2026, 2027, …
+  status:           Enum[:pending, :active, :complete]
+  current_gameweek: Integer           # 1-indexed; advances after each full round
 }
 
-# League table entry (derived, not persisted)
+# League table entry — derived from played fixtures, never persisted
 TableRow {
-  club:         Club
-  played:       Integer
-  won:          Integer
-  drawn:        Integer
-  lost:         Integer
-  gf:           Integer
-  ga:           Integer
-  gd:           Integer
-  points:       Integer
+  club:    Club
+  played:  Integer
+  won:     Integer
+  drawn:   Integer
+  lost:    Integer
+  gf:      Integer
+  ga:      Integer
+  gd:      Integer
+  points:  Integer
 }
 ```
+
+**Fixture scheduling:** requires an **even number of clubs** so every team plays every gameweek (no byes). With **10 clubs**, full home-and-away is **90 fixtures** (each pair meets twice): **5 matches per gameweek** × **18 gameweeks**. Fixture order uses the standard round-robin rotation algorithm.
 
 ---
 
@@ -247,12 +251,11 @@ TableRow {
 ```ruby
 Fixture {
   id:           Integer
-  season_id:    Integer
+  league_id:    Integer   # references leagues(id)  [stored as season_id in the DB column]
   gameweek:     Integer
   home_club_id: Integer
   away_club_id: Integer
-  played:       Boolean
-  match_id:     Integer    # null until played
+  played:       Boolean   # false until result saved
 }
 
 Match {
@@ -260,53 +263,32 @@ Match {
   fixture_id:      Integer
   home_score:      Integer
   away_score:      Integer
-  home_possession: Integer   # percentage
-  home_shots:      Integer
-  home_shots_ot:   Integer
-  away_shots:      Integer
-  away_shots_ot:   Integer
-  events:          JSON       # goals, cards, subs as structured array
-  player_ratings:  JSON       # { player_id => rating }
-  narrative:       Text       # AI-generated match report (nullable)
+  home_possession: Integer   # percentage (future)
+  home_shots:      Integer   # future
+  home_shots_ot:   Integer   # future
+  away_shots:      Integer   # future
+  away_shots_ot:   Integer   # future
+  events:          JSON      # goals, cards, subs — future
+  player_ratings:  JSON      # { player_id => rating } — future
+  narrative:       Text      # AI-generated match report — future
 }
 ```
 
----
-
-### Season & Gameweek
-
-```ruby
-Season {
-  id:           Integer
-  league_id:    Integer
-  year:         Integer     # e.g. 2024
-  current_gw:   Integer
-  status:       Enum[:pre_season, :active, :complete]
-}
-```
+> **DB note:** the `fixtures` table has a `season_id` column (from migration 003). We treat this as `league_id` at the Ruby layer and alias it in `FixtureRepository`. A future migration can rename the column once SQLite tooling allows it cleanly.
 
 ---
 
-### Save & Manager
+### Manager
 
 ```ruby
-Save {
-  id:           Integer
-  manager_name: String
-  club_id:      Integer
-  season_id:    Integer
-  created_at:   DateTime
-}
-
 Manager {
-  id:      Integer
-  name:    String
-  save_id: Integer
-  club_id: Integer
+  id:               Integer
+  display_name:     String    # shown in the header and match reports
+  managed_club_id:  Integer   # references clubs(id)
 }
 ```
 
-A `Save` is the root of a game state. Everything — fixtures, results, squad changes — hangs off a save. Multiple saves are supported but only one is active at a time.
+One manager row per SQLite file (single-save slot for now). The active league is derived from `Club#league_id` rather than stored on the manager directly.
 
 ---
 
@@ -814,40 +796,111 @@ puts "Smoke test passed."
 
 ## Development Phases
 
-### Phase 1 — Playable Core (no AI)
-- [ ] Domain models: Player, Club, League, Fixture, Season, Save, Manager
-- [ ] Domain models: MatchSelection, PlayerAvailability, ScoutReport
-- [ ] SQLite schema + migrations
-- [ ] Seed data: Premier League (20 clubs, ~500 players)
-- [ ] `gaffer new` — name → league → club → save created → fixtures generated
-- [ ] `gaffer next` — scout report → squad selection → tactic → simulate → result
-- [ ] `gaffer table` — league standings
-- [ ] `gaffer squad` — squad list with availability
-- [ ] `gaffer fixtures` — fixture list with results
-- [ ] Match engine: simulate() with Poisson goal sampling
-- [ ] ScoutReportBuilder: template-based strengths/weaknesses from squad attributes
-- [ ] Best XI suggestion: highest available overall by position
-- [ ] Interactive XI swap via TTY prompt
-- [ ] Injury system: post-match random knock generation
-- [ ] Template narrator fallback (no AI needed)
+### Phase 1a — Foundation ✅ (done)
+- [x] Domain models: Club, Player, Fixture, Match, MatchResult, MatchEngine, Manager
+- [x] SQLite schema + migrations (clubs, players, fixtures, matches, managers)
+- [x] Seed data: 10 fictional clubs in paired tiers (`db/seeds/fictional_ten_teams.rb`; short codes `CRW … MBW`)
+- [x] First-run onboarding: name + club selection persisted in `managers` table
+- [x] Manager identity shown in CLI header
+- [x] `bin/gaffer` opens interactive menu with GAFFER block-font hero
+- [x] Play game: simulate managed club vs foil, display result
+- [x] Match engine: Poisson goal sampling, tactic modifiers, home advantage
+- [x] Tests: match engine, manager repository, DB migrations
 
-### Phase 2 — AI Narrative Layer
+---
+
+### Phase 1b — League & Season (next up)
+
+#### Decisions
+- **No separate Season model.** A League row *is* a season. Each year = a new League row.
+- **10 seeded clubs** (bye-free weeks). All load from **`db/seeds/fictional_ten_teams.rb`**; league start does **not** add/remove clubs from the roster.
+- **18 gameweeks** full home+away (**90** fixtures total, **5** matches per gameweek).
+- **User triggers season start** — fixtures are generated at runtime, not by `rake db:seed`.
+- **Only the managed club's match is "played"** in the UI; the **other four** gameweek matches auto-simulate silently.
+- **All fixtures played → auto end-of-season** (final table + prompt to start next year).
+
+#### Implementation steps (in order)
+
+**Step 1 — Seed data ✅**
+- **`db/seeds/fictional_ten_teams.rb`** — ten clubs in five loosely paired tiers (deterministic procedural squads, **23 players** each).
+- Canonical short codes: `CRW STB KLF VPK AHU RCT FAB LAN HCY MBW`. Skip/aborted-on-partial behaviour unchanged.
+
+**Step 2 — `leagues` migration + domain model**
+- Migration `006_create_leagues.rb`: `id`, `name`, `year` (integer), `status` (string), `current_gameweek` (integer, default 1)
+- Migration `007_add_league_id_to_clubs.rb`: add nullable `league_id` integer column to `clubs`
+- `Domain::League` struct: `id`, `name`, `year`, `status` (symbol), `current_gameweek`
+- `Repositories::LeagueRepository`: `find(id)`, `active` (first with `status: :active`), `save(league)`, `complete!(id)`
+
+**Step 3 — `Domain::FixtureGenerator` (pure, no DB)**
+- Takes `Array<Integer>` of club IDs, returns `Array<Fixture>` with `gameweek`, `home_club_id`, `away_club_id`, `league_id` set, `id: nil`, `played: false`
+- Uses standard round-robin rotation: fix one team, rotate the rest across N-1 rounds; repeat reversed for the return leg
+- Tested in isolation (no DB, no repos)
+
+**Step 4 — `Commands::StartLeague`**
+- Guard: refuse if a league is already `:active`
+- Determine year: `LeagueRepository.latest_year + 1` (default 2026 if none)
+- Create League row (`:pending`)
+- Assign all clubs `league_id` → new league
+- Generate fixtures via `FixtureGenerator`, bulk-insert to DB
+- Mark league `:active`, `current_gameweek: 1`
+- Print: `"Season 2026 is underway. Gameweek 1 of 18. First fixture: [date]"`
+- Add "Start new season" to main menu (only shown when no active league)
+
+**Step 5 — `gaffer next` command**
+- Find the manager's next unplayed fixture for the active league (`FixtureRepository.next_for_club`)
+- If none exists and league is active → trigger end-of-season (see Step 7)
+- Simulate the managed club's match; display result to screen
+- Auto-simulate the **other four fixtures** in the same gameweek (silent — save results, no output)
+- Mark all **five** fixtures in the round `played: true`, save Match rows
+- Advance `league.current_gameweek += 1`
+- Print: your scoreline + the **other four** results as a brief summary
+- Print: your current league position (`gaffer table` inline summary — top 3 + your row)
+- Add "Next fixture" to main menu (only shown when a league is active)
+
+**Step 6 — `gaffer table` command**
+- Query all played fixtures for the active league
+- Build `TableRow` per club (W/D/L/GF/GA/GD/Pts) — pure derived calculation, never persisted
+- Sort by points desc, then GD desc, then GF desc
+- Render with `tty-table` (columns: Pos · Club · P · W · D · L · GF · GA · GD · Pts)
+- Managed club row highlighted (bold or colour marker)
+
+**Step 7 — End-of-season detection**
+- After advancing `current_gameweek`, check: `current_gameweek > 18` (all rounds played)
+- If complete: `LeagueRepository.complete!(id)`; show full final table with managed club highlighted
+- Prompt: `"Start Season [year+1]? [Y/n]"` — Yes → `StartLeague`; No → return to menu
+
+#### Out of scope for Phase 1b
+- Tactic selection (all matches use `:balanced`)
+- Squad selection / best XI
+- Injuries / suspensions
+- Board reactions / sack mechanic
+- Transfer window
+
+---
+
+### Phase 2 — Match Day Detail
+- [ ] Tactic selection before each fixture (All Out Attack / Attacking / Balanced / Defensive / Park the Bus)
+- [ ] `gaffer squad` — squad list with position, overall, form
+- [ ] `gaffer fixtures` — full fixture list with results for the active league
+- [ ] Post-match: brief scoreline + your league position after every result
+- [ ] Injury system: 7% chance per outfield player per match (1–3 GW out), 4% for GKs
+
+### Phase 3 — AI Narrative Layer
 - [ ] Anthropic client + Claude narrator
-- [ ] Match report prompt v1
-- [ ] Press conference command
-- [ ] Config / BYOK setup
+- [ ] Match report prompt v1 (replaces plain scoreline output)
+- [ ] Press conference command (`gaffer press`)
+- [ ] Config / BYOK setup (`gaffer config`)
 - [ ] Fake narrator + WebMock wired into test_helper
 - [ ] Smoke test script for manual narrator verification
 
-### Phase 3 — Management Depth
-- [ ] Transfer market (in/out window)
+### Phase 4 — Management Depth
+- [ ] Transfer market (in/out window, `gaffer transfers`)
 - [ ] Player morale + form system
 - [ ] Board confidence + sack mechanic
-- [ ] Tactic selection before each match
-
-### Phase 4 — Polish
-- [ ] TTY rich UI (tables, boxes, colour)
 - [ ] Multiple save slots
+
+### Phase 5 — Polish
+- [ ] Full TTY rich UI (tty-box panels, colour theming)
 - [ ] OpenAI adapter (alternative narrator)
 - [ ] README with demo GIF
 

@@ -19,9 +19,9 @@ bundle exec rake db:seed
 
 First launch of `./bin/gaffer` runs **migrations** automatically, then asks you to **pick a manager name** and **which seeded club you manage** (stored in the `managers` table). Clearing the SQLite file or switching `GAFFER_DB_PATH` resets that choice.
 
-`db:seed` runs migrations first, then inserts five fictional clubs of **different strengths** (short codes `CRW` → `AHU` → `RCT` → `FAB` → `MBW`, roughly strongest to weakest): **Crowden Rovers**, **Ashton Heath United**, **Riverside Town**, **Fenbury Athletic**, and **Millbrook Wanderers**, each with **23 players** plus club reputation, budget, and stadium.
+`db:seed` runs migrations first, then inserts **ten** fictional clubs in **five loosely paired tiers** (strongest → weakest: `CRW`, `STB`, `KLF`, `VPK`, `AHU`, `RCT`, `FAB`, `LAN`, `HCY`, `MBW`). Each club has **23 players** plus reputation, budget, stadium, and board metadata.
 
-Re-running skips if **all five** short codes already exist. If you have a partial seed or old dev data from an earlier checkout, delete `db/gaffer.sqlite` or point `GAFFER_DB_PATH` at a new file before seeding again.
+Re-running skips if **all ten** short codes already exist. If you have a partial seed or old dev data from an earlier checkout, delete `db/gaffer.sqlite` or point `GAFFER_DB_PATH` at a new file before seeding again.
 
 By default the SQLite file is `db/gaffer.sqlite` (the directory is created if needed). Override with:
 
