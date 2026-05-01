@@ -63,8 +63,7 @@ describe Gaffer::Domain::ScoutReportBuilder do
     FileUtils.rm_f(@tmp_path)
     ENV["GAFFER_DB_PATH"] = File.expand_path(@tmp_path)
 
-    Gaffer::Database.connect
-    Gaffer::Database.migrate
+    Gaffer::Database.prepare
 
     @club_ids =
       ["Apple United", "Banana Rangers", "Cherry Vale", "Date Town"].map do |name|

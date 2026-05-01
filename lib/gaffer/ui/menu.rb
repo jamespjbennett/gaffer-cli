@@ -21,7 +21,7 @@ module Gaffer
       def run
         pastel = Pastel.new
         prompt = TTY::Prompt.new
-        connect_and_migrate
+        Gaffer::Database.prepare
 
         clubs = Repositories::ClubRepository.all
 
@@ -123,11 +123,6 @@ module Gaffer
             break
           end
         end
-      end
-
-      def connect_and_migrate
-        Gaffer::Database.connect
-        Gaffer::Database.migrate
       end
 
       def banner_and_seed_warning(pastel, prompt)

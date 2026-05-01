@@ -13,7 +13,7 @@ namespace :db do
   task :migrate do
     $LOAD_PATH.unshift("#{__dir__}/lib")
     require "gaffer/database"
-    Gaffer::Database.migrate
+    Gaffer::Database.prepare
     puts "Migrations applied to #{Gaffer::Database.connection.opts[:database]}"
   end
 

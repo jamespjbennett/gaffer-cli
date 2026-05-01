@@ -33,6 +33,7 @@ Vocabulary for architecture and product discussions. Authoritative game rules an
 
 - **Domain** — Plain Ruby objects and pure logic; no ORM types in model structs (repositories map rows ↔ domain).
 - **Repositories** — Sequel-backed persistence for clubs, players, fixtures, matches, leagues, etc.
+- **Database.prepare** — Default app bootstrap (`Gaffer::Database.prepare`): connects to SQLite (ENV path, default file, or optional Sequel URL when not yet connected) and runs migrations. Use at CLI/menu/console/command entry unless you deliberately need a lighter path (e.g. tests that only `#disconnect`).
 - **Commands** — User-facing operations (Thor tasks and menu): **StartLeague**, **NextFixture**, **PlayMatch**, standings/fixtures/scorers, etc.
 - **Presenters** — TTY formatting (tables, scout screen, matchday squad).
 - **Narrators** *(planned)* — LLM adapter seam for match copy; not shipped yet.

@@ -10,7 +10,7 @@ module Gaffer
     # Starts IRB with the default SQLite DB (GAFFER_DB_PATH / db/gaffer.sqlite)
     # or an explicit Sequel URL (e.g. sqlite://tmp/dev.sqlite).
     def start(database_url = nil)
-      Gaffer::Database.connect(database_url) if Gaffer::Database.connection.nil?
+      Gaffer::Database.prepare(database_url)
 
       define_helpers!
       $stderr.puts intro

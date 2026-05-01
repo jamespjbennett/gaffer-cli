@@ -16,8 +16,7 @@ module Gaffer
         # @param year [Integer, nil] most recent league row for this calendar year
         # @return [Symbol] `:ok`, `:no_active_league`, or `:no_standings_target`
         def run(pastel: Pastel.new, out: $stdout, league: nil, previous: false, year: nil)
-          Gaffer::Database.connect
-          Gaffer::Database.migrate
+          Gaffer::Database.prepare
 
           target = SeasonLookup.resolve(league:, previous:, year:, out:, pastel:)
 

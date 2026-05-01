@@ -51,7 +51,7 @@ module Gaffer
         private
 
         def ensure_db_connected
-          Gaffer::Database.connect
+          Gaffer::Database.prepare
         end
 
         def resolve_manager

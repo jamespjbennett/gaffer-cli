@@ -3,7 +3,7 @@
 # Ten fictional clubs in five loosely paired tiers (similar strength pairs top → bottom).
 # bundle exec rake db:seed
 
-Gaffer::Database.connect
+Gaffer::Database.prepare
 
 clubs_ds = Gaffer::Database.db[:clubs]
 ClubRepo = Gaffer::Repositories::ClubRepository

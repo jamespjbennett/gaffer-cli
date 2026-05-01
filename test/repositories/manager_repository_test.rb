@@ -13,8 +13,7 @@ describe Gaffer::Repositories::ManagerRepository do
     @tmp_path = File.join(Dir.tmpdir, "gaffer_manager_test_#{SecureRandom.hex(6)}.sqlite")
     FileUtils.rm_f(@tmp_path)
     ENV["GAFFER_DB_PATH"] = @tmp_path
-    Gaffer::Database.connect
-    Gaffer::Database.migrate
+    Gaffer::Database.prepare
     @club_id = Gaffer::Database.db[:clubs].insert(
       name: "Testville",
       short_name: "TST",

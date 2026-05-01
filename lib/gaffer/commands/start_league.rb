@@ -14,7 +14,7 @@ module Gaffer
       class << self
         # @return [Symbol] `:ok`, `:skipped_active`, `:no_clubs`, `:bad_club_count`, or `:generation_error`
         def run(pastel: Pastel.new, out: $stdout)
-          Gaffer::Database.connect
+          Gaffer::Database.prepare
 
           return skip_active(pastel, out) if Repositories::LeagueRepository.active
 

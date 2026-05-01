@@ -13,7 +13,7 @@ describe "Repositories" do
     FileUtils.mkdir_p(File.dirname(path))
     ENV["GAFFER_DB_PATH"] = path
     Gaffer::Database.disconnect
-    Gaffer::Database.migrate
+    Gaffer::Database.prepare
     yield Gaffer::Database.db
     Gaffer::Database.disconnect
     FileUtils.rm_f(path)

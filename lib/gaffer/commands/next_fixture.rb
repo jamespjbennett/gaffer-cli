@@ -31,8 +31,7 @@ module Gaffer
         private
 
         def ensure_db_connected
-          Gaffer::Database.connect
-          Gaffer::Database.migrate
+          Gaffer::Database.prepare
         end
       end
     end

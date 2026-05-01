@@ -13,7 +13,7 @@ module Gaffer
       attr_accessor :connection
 
       def db
-        raise Error, "Database not connected. Call Gaffer::Database.connect first." unless connection
+        raise Error, "Database not connected. Call Gaffer::Database.prepare (or connect) first." unless connection
 
         connection
       end
@@ -33,6 +33,16 @@ module Gaffer
         opts = { allow_missing_migration_files: true }
         opts[:target] = target unless target.nil?
         Sequel::Migrator.run(connection, migrations_path, **opts)
+      end
+
+      # Default bootstrap for CLI, menu, and console: opens SQLite (ENV path or repo default —
+      # or +database_url+ when not yet connected) and applies pending migrations. Idempotent.
+      #
+      # @param database_url [String, nil] passed to Sequel on first connection only (+connect+ ignores +nil+ and uses ENV/default).
+      # @see #migrate
+      def prepare(database_url = nil)
+        connect(database_url) if connection.nil?
+        migrate
       end
 
       def migrations_path

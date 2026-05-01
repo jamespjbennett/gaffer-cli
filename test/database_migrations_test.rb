@@ -14,7 +14,7 @@ describe "database migrations" do
 
     ENV["GAFFER_DB_PATH"] = db_path
     Gaffer::Database.disconnect
-    Gaffer::Database.migrate
+    Gaffer::Database.prepare
   end
 
   after do
