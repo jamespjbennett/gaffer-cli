@@ -132,32 +132,72 @@ module Gaffer
       end
 
       def render_header(pastel, manager:, managed_club:)
-        v = Gaffer::VERSION
-        block_font = TTY::Font.new(:block)
-        title_lines = block_font.write("GAFFER").lines.map(&:rstrip).reject(&:empty?)
-        width = title_lines.map(&:length).max.to_i
-        width = 1 if width < 1
-        rule = pastel.dim("─" * width)
+        MenuHeader.assemble(pastel, manager:, managed_club:)
+      end
+    end
 
-        body = title_lines.map { |line| pastel.bold.white(line) }.join("\n")
-        cli = pastel.bold.white("CLI".center(width))
-        tag = "Football management  ·  v#{v}"
-        tag_plain = tag.length <= width ? tag.center(width) : tag
-        tag_line = pastel.dim(tag_plain)
+    # Block-font hero + ruler + subtitle for [`Menu`].
+    module MenuHeader
+      class << self
+        RULE_CHAR = "─"
 
-        manager_line =
-          if manager && managed_club
-            snippet = "#{manager.display_name.strip} · managing #{managed_club.name}".strip
-            snippet.length <= width ? pastel.dim(snippet.center(width)) : pastel.dim(snippet)
-          else
-            nil
-          end
+        # @return [String] frozen multiline banner
+        def assemble(pastel, manager:, managed_club:)
+          lines, width = ascii_title_geometry
+          rule = pastel.dim(rule_bar(width))
 
-        banner = +""
-        banner << "\n#{rule}\n#{body}\n#{cli}\n#{tag_line}\n"
-        banner << "#{manager_line}\n" if manager_line
-        banner << "#{rule}\n"
-        banner.freeze
+          banner = +""
+          banner << "\n#{boxed_core(rule, pastel, lines, width)}"
+          banner << "#{manager_sentence(pastel, manager:, managed_club:, width:)}" if mgr_pair?(manager, managed_club)
+          banner << "#{rule}\n"
+          banner.freeze
+        end
+
+        private
+
+        def ascii_title_geometry
+          font = TTY::Font.new(:block)
+          raw = font.write("GAFFER").lines.map(&:rstrip).reject(&:empty?)
+          span = raw.map(&:length).max.to_i
+          span = 1 if span < 1
+          [raw, span]
+        end
+
+        def rule_bar(width)
+          RULE_CHAR * width
+        end
+
+        def boxed_core(rule, pastel, lines, width)
+          "#{rule}\n#{tinted_logo(pastel, lines)}\n#{cli_row(pastel, width)}\n#{tag_row(pastel, width)}\n"
+        end
+
+        def tinted_logo(pastel, lines)
+          lines.map { |ln| pastel.bold.white(ln) }.join("\n")
+        end
+
+        def cli_row(pastel, width)
+          pastel.bold.white("CLI".center(width))
+        end
+
+        def tag_row(pastel, width)
+          plain = version_tag_plain(width)
+          pastel.dim(plain)
+        end
+
+        def version_tag_plain(width)
+          txt = +"Football management  ·  v#{Gaffer::VERSION}"
+          txt.length <= width ? txt.center(width) : txt
+        end
+
+        def mgr_pair?(manager, club)
+          manager && club
+        end
+
+        def manager_sentence(pastel, manager:, managed_club:, width:)
+          body = +"#{manager.display_name.strip} · managing #{managed_club.name}".strip
+          tinted = body.length <= width ? pastel.dim(body.center(width)) : pastel.dim(body)
+          "#{tinted}\n"
+        end
       end
     end
   end
