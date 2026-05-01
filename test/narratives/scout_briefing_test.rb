@@ -92,8 +92,8 @@ describe Gaffer::Narratives::ScoutBriefing do
     _(lines.size).must_be :>=, 5
   end
 
-  it "mentions early doors before the league wakes up" do
+  it "mentions early-season tone before the league wakes up" do
     lines = Gaffer::Narratives::ScoutBriefing.paragraphs(minimal_report(played: 0, manager_played: 0, recent_form: [], opponent_points: 0, manager_points: 0))
-    _(lines.join).must_match(/early doors/i)
+    _(lines.join).must_match(/early doors|let's get stuck in/i)
   end
 end

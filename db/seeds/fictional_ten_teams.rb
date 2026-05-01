@@ -170,7 +170,7 @@ def build_player(team_short:, tier:, position:, lineup_index:)
   years = rng.rand(1..4)
   wage = rng.rand((tier <= 5 ? 3 : 1)..(tier * 24 + rng.rand(-3..38)))
   wage = wage.clamp(1, tier * 40 + 30)
-  form = rng.rand((tier <= 5 ? 5 : 4)..8)
+  form = rng.rand(4..7)
   morale = [:okay, :happy, :unsettled, :okay, :okay].sample(random: rng)
   pot_delta = rng.rand((tier <= 7 ? 2 : 1)..12)
 

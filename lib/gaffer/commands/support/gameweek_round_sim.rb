@@ -22,9 +22,15 @@ module Gaffer
           :managed_xi
         )
 
+        SimulateOutcome = Data.define(:result, :home_xi, :away_xi)
+
         module_function
 
         def simulate(plan)
+          simulate_full(plan).result
+        end
+
+        def simulate_full(plan)
           fx = plan.fixture
           hid = fx.home_club_id.to_i
           aid = fx.away_club_id.to_i
@@ -32,7 +38,7 @@ module Gaffer
           picks = xi_pair(plan:, hid:, aid:, mid:)
           home_club = plan.clubs_by_id.fetch(fx.home_club_id)
           away_club = plan.clubs_by_id.fetch(fx.away_club_id)
-          plan.engine.simulate(
+          res = plan.engine.simulate(
             home_club: home_club,
             home_players: picks.first,
             away_club: away_club,
@@ -41,6 +47,7 @@ module Gaffer
             away_tactic: plan.away_tactic,
             seed: plan.seed
           )
+          SimulateOutcome.new(result: res, home_xi: picks.first, away_xi: picks.last)
         end
 
         def build_match(fixture_id:, result:)

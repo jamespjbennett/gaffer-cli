@@ -249,5 +249,23 @@ describe Gaffer::Domain::MatchEngine do
       _(tweaked.home_xg_lambda).wont_equal base.home_xg_lambda
       _(tweaked.away_xg_lambda).wont_equal base.away_xg_lambda
     end
+
+    it "boosts home attacking threat when morale and form are high" do
+      grin = strong_team.map { |pl| Gaffer::Domain::Player.new(**pl.to_h.merge(morale: :ecstatic, form: 10)) }
+      grim = strong_team.map { |pl| Gaffer::Domain::Player.new(**pl.to_h.merge(morale: :unhappy, form: 1)) }
+      lo = engine.simulate(
+        home_club: strong_club, home_players: grim,
+        away_club: weak_club, away_players: weak_team,
+        home_tactic: :balanced, away_tactic: :balanced,
+        seed: 45_001
+      )
+      hi = engine.simulate(
+        home_club: strong_club, home_players: grin,
+        away_club: weak_club, away_players: weak_team,
+        home_tactic: :balanced, away_tactic: :balanced,
+        seed: 45_001
+      )
+      _(hi.home_xg_lambda).must_be :>, lo.home_xg_lambda
+    end
   end
 end

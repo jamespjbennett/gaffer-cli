@@ -20,7 +20,7 @@ module Gaffer
         mgr_short = mgr.empty? ? "your side" : mgr
 
         loc =
-          report.hosting_managed ? "#{opp} roll into your patch" : "you trek to #{opp}"
+          report.hosting_managed ? "#{opp} at home" : "you are visiting #{opp}"
         paras << +"Gameweek #{Integer(report.gameweek)} — #{loc}. Here's what we've pieced together."
 
         paras << league_blurb(report, opp:, mgr_short:)
@@ -50,7 +50,7 @@ module Gaffer
         opener = +"#{opp} are #{pos} with #{pts_word(opp_pts)} from #{played} played."
 
         if played.zero? && our_p.zero?
-          opener << " It's early doors — everyone's still trading on reputation."
+          opener << " New season, let's get stuck in!"
           return opener
         end
 
@@ -59,7 +59,7 @@ module Gaffer
           opener << " That's #{diff} point#{diff == 1 ? '' : 's'} ahead of #{mgr_short}, sitting on #{pts_word(our_pts)} #{our_rank}."
         elsif diff.negative?
           ad = diff.abs
-          opener << " We're #{ad} point#{ad == 1 ? '' : 's'} better off #{our_rank} with #{pts_word(our_pts)} — they trail and know it."
+          opener << " We're #{ad} point#{ad == 1 ? '' : 's'} better off #{our_rank} with #{pts_word(our_pts)} — they will be looking to close the gap."
         else
           opener << " #{mgr_short} are parked on #{pts_word(our_pts)} too — honours even."
         end
@@ -72,9 +72,7 @@ module Gaffer
         return nil if played <= 0
 
         form = Array(report.recent_form)
-        if form.empty?
-          return +"League ledger's thin on them yet — treat their tape with a pinch of salt."
-        end
+        return "" if form.empty?
 
         w = form.count { |x| x == :w }
         d = form.count { |x| x == :d }
@@ -83,14 +81,14 @@ module Gaffer
 
         vibe =
           if l_ct >= w + 2 || l_ct >= 3
-            "they've looked leg-heavy and short on belief"
+            "have not been in great form"
           elsif w >= l_ct + 2 || w >= 3
-            "they've been in confident touch"
+            "they're looking pretty good right now"
           else
-            "form's been middling rather than flashy"
+            "form's been a bit patchy"
           end
 
-        +"Recent mood? #{opp} #{vibe} — #{w} win#{'s' unless w == 1}, #{d} draw#{'s' unless d == 1}, #{l_ct} defeat#{'s' unless l_ct == 1} across their last #{sample}."
+        +"Looking at form,  #{opp} #{vibe} — #{w} win#{'s' unless w == 1}, #{d} draw#{'s' unless d == 1}, #{l_ct} defeat#{'s' unless l_ct == 1} across their last #{sample}."
       end
 
       def stylistic_blurb(report, opp:, mgr_short:)
@@ -101,24 +99,24 @@ module Gaffer
 
         skew =
           if oa - od >= DELTA_MARGIN
-            "#{opp}'s scouts lean on attacking punch — forwards get serviced."
+            "#{opp} are likely to be quite attack-minded."
           elsif od - oa >= DELTA_MARGIN
-            "#{opp} lock in through the spine first; they're bred for clean sheets."
+            "#{opp} are pretty solid at the back and don't give much away."
           else
-            "#{opp} aren't lopsided — danger comes from clever rotation at both ends."
+            "#{opp} are pretty balanced, with a decent but not overwhelming attack and defence."
           end
 
         vs_us = +""
         if oa >= ma + DELTA_MARGIN
-          vs_us << " Numerically they've got a sharper forward unit than #{mgr_short} right now."
+          vs_us << " They are little stronger upfront than us."
         elsif ma >= oa + DELTA_MARGIN
-          vs_us << " Our front line stacks up bolder on paper if we keep the tempo honest."
+          vs_us << " Our attack should be stronger than theirs."
         end
 
         if od >= md + DELTA_MARGIN
-          vs_us << " Their rearguard's weighted heavier than ours in the previews."
+          vs_us << " They've got a strong defence so we'll have to be clinical."
         elsif md >= od + DELTA_MARGIN
-          vs_us << " #{mgr_short}'s defensive steel edges theirs — they'll need flashes of genius."
+          vs_us << " Our defence should be strong enough to keep them out as long as we stay switched on"
         end
 
         skew + vs_us.to_s
@@ -140,17 +138,17 @@ module Gaffer
           g = goals.to_i
           goal_phr =
             if g.positive?
-              "#{g} goal#{g == 1 ? '' : 's'} chalked already this campaign"
+              "#{g} goal#{g == 1 ? '' : 's'} goals this season"
             else
               "a nose for nuisance in the box"
             end
-          +"Train one eye on #{name} — #{goal_phr}, so don't concede silly second balls."
+          +"We'll need to keep an eye on #{name} — #{goal_phr}, let's keep tight on him."
         when :livewire
-          +"#{name}'s the live-wire type who drags defenders out of shape — choke their supply early."
+          +"#{name}'s the one who makes things happen for them, let's get into him early and keep him quiet."
         when :enforcer
-          +"#{name} tidies transitions from deep; spoil their rhythm there and lanes open up."
+          +"#{name} is their enforcer, so let's keep him under control and press high so he can't dictate play."
         else
-          +"#{name}'s flagged on the clipboard."
+          +"#{name}'s is one to watch out for."
         end
       end
 
@@ -163,26 +161,26 @@ module Gaffer
 
         tougher = +""
         if opp_rank < our_rank
-          tougher << "They're sitting above #{mgr_short} in the table "
+          tougher << "They're sitting above us in the table "
           tougher <<
             if gap_pts.positive?
-              "with breathing room — treat it like a heavyweight round."
+              "by a decent margin, we'll have to give it everything we've got."
             else
-              "but only just — nip complacency early and the crowd turns."
+              "but only just — this is a great chance to close the gap"
             end
           return tougher
         end
 
         if our_rank < opp_rank
-          return +"We start with the league ladder on #{mgr_short}'s collar — pedigree doesn't score goals unless we sharpen the details."
+          return +"We're ahead of them in the table, so let's keep the pressure on and not let them get back into it."
         end
 
         if gap_pts.zero?
-          +"Table neck-and-neck; whoever lands the cleaner moments nicks momentum."
+          +"League position is neck-and-neck; it's going to be a tight game but this is a great chance to pull away."
         elsif opp_atk >= our_def + DELTA_MARGIN
-          +"Their forward unit can fray us if we're passive — squeeze the midfield and defenders breathe easier."
+          +"Their attack is strong, so we shouldn't be going all out attack - let's keep it tight in our half."
         else
-          +"Could swing fast either way — first goal probably drags them one way mentally."
+          +"On paper it looks 50/50 - starting the game well will be crucial to get the edge. "
         end
       end
 

@@ -3,6 +3,7 @@
 require_relative "club"
 require_relative "player"
 require_relative "match_result"
+require_relative "morale_form_multiplier"
 require_relative "scorer_picker"
 
 module Gaffer
@@ -112,6 +113,11 @@ module Gaffer
       end
 
       def contribution_attack(p)
+        base = raw_contribution_attack(p)
+        apply_morale_form(base, p)
+      end
+
+      def raw_contribution_attack(p)
         pace = iv(p, :pace)
         sho = iv(p, :shooting)
         pas = iv(p, :passing)
@@ -130,6 +136,11 @@ module Gaffer
       end
 
       def contribution_defense(p)
+        base = raw_contribution_defense(p)
+        apply_morale_form(base, p)
+      end
+
+      def raw_contribution_defense(p)
         pace = iv(p, :pace)
         defn = iv(p, :defending)
         phys = iv(p, :physical)
@@ -142,6 +153,10 @@ module Gaffer
         when :att then (defn * 0.50 + pace * 0.25 + phys * 0.25)
         else (defn * 0.42 + pace * 0.22 + phys * 0.36)
         end
+      end
+
+      def apply_morale_form(raw, player)
+        raw * Domain::MoraleFormMultiplier.for(player)
       end
 
       def iv(p, attr)

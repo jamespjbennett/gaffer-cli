@@ -2,6 +2,8 @@
 
 require "pastel"
 
+require_relative "../repositories/player_repository"
+
 module Gaffer
   module Commands
     # Create a `{League}` row, attach all clubs, generate and bulk-insert fixtures, then activate the league.
@@ -51,6 +53,8 @@ module Gaffer
               )
 
               Repositories::FixtureRepository.import_new_fixtures!(protos_for_ui)
+
+              Repositories::PlayerRepository.soft_reset_morale_form_for_club_ids!(club_ids_sorted)
 
               Repositories::LeagueRepository.save(
                 Domain::League.new(

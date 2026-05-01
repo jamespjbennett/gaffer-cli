@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+require_relative "../domain/morale/form_norm"
+require_relative "../domain/morale/morale_step"
+
 module Gaffer
   module Repositories
     class PlayerRepository < Base
@@ -24,7 +27,29 @@ module Gaffer
           end
         end
 
+        def update_morale_form_batch(updates)
+          updates.each { |(id, pair)| apply_morale_form_pair(id, pair) }
+        end
+
+        def soft_reset_morale_form_for_club_ids!(club_ids)
+          club_ids.each { |cid| soft_reset_club(cid) }
+        end
+
         private
+
+        def soft_reset_club(cid)
+          for_club(cid).each { |pl| apply_soft_reset_row(pl) }
+        end
+
+        def apply_soft_reset_row(player)
+          nf = Domain::Morale::FormNorm.soft_merge_to_five(player.form)
+          nm = Domain::Morale::MoraleStep.toward_okay(player.morale)
+          players_ds.where(id: player.id).update(form: nf, morale: nm.to_s)
+        end
+
+        def apply_morale_form_pair(id, pair)
+          players_ds.where(id: id).update(form: pair.fetch(:form), morale: pair.fetch(:morale).to_s)
+        end
 
         def players_ds
           db[:players]
