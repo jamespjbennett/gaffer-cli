@@ -1,13 +1,14 @@
 # CLAUDE.md — Gaffer
 
-> An AI-native football management CLI built in Ruby.
-> You are the gaffer. Your key, your club, your call.
+> A football management CLI built in Ruby — sim core and league play today; AI narrative (BYOK) on the roadmap.
 
 ---
 
 ## Project Overview
 
-Gaffer is a terminal-based football management game written in Ruby. The player takes charge of a club, manages their squad, navigates a league season, and handles the human drama of the dugout — press conferences, board pressure, transfer negotiations — powered by an LLM narrative layer sitting on top of a deterministic simulation core.
+Gaffer is a terminal-based football management CLI in Ruby: **deterministic match engine**, **league loop**, dugout XI + tactics, **template scout + board copy** — with **optional LLM narrative** planned later (BYOK patterns below).
+
+Design goals include clean domain modelling and a narrator adapter boundary **when** Phase 3 lands.
 
 The project is designed to demonstrate:
 - Clean Ruby domain modelling
@@ -23,63 +24,23 @@ The project is designed to demonstrate:
 - **Language**: Ruby 3.x
 - **CLI framework**: Thor (commands) + TTY toolkit (`tty-prompt`, `tty-table`, `tty-box`, `pastel`) for rich terminal UI
 - **Persistence**: SQLite via Sequel ORM (lightweight, file-based, no setup required)
-- **AI layer**: Anthropic Ruby SDK (`anthropic` gem), modular via adapter pattern
+- **AI layer** *(planned)*: Anthropic Ruby SDK + narrator adapter — not yet in `Gemfile` or `lib/`
 - **Testing**: Minitest + minitest/spec DSL + WebMock for blocking real HTTP in tests
-- **Config**: dotenv for local dev; XDG config dir for user installs
+- **Config**: `dotenv` for local dev; BYOK file resolution described below is **roadmap** (no `lib/gaffer/config.rb` yet)
 
 ---
 
-## API Key Setup (BYOK)
+## API Key Setup (BYOK) — *roadmap*
 
-Gaffer never ships with or manages API keys. Users provide their own Anthropic key.
+The shipped game is **fully offline**: match sim, scout briefing, board letter, and tables use DB + template copy only.
 
-### Resolution order
+When the narrator layer lands, the intended pattern is:
 
 1. `ANTHROPIC_API_KEY` environment variable
 2. `~/.config/gaffer/config.yml` → `anthropic_api_key:`
-3. Prompt on first run, offer to save to config
+3. Optional first-run prompt to save the key (see sketch in older commits / Phase 3)
 
-### Implementation
-
-```ruby
-# lib/gaffer/config.rb
-module Gaffer
-  class Config
-    CONFIG_PATH = File.expand_path("~/.config/gaffer/config.yml")
-
-    def self.api_key
-      ENV["ANTHROPIC_API_KEY"] ||
-        saved_config["anthropic_api_key"] ||
-        prompt_and_save
-    end
-
-    def self.saved_config
-      return {} unless File.exist?(CONFIG_PATH)
-      YAML.load_file(CONFIG_PATH) || {}
-    end
-
-    def self.prompt_and_save
-      puts "No Anthropic API key found."
-      puts "Get one at https://console.anthropic.com"
-      key = TTY::Prompt.new.mask("Enter your API key:")
-      save = TTY::Prompt.new.yes?("Save to ~/.config/gaffer/config.yml?")
-      if save
-        FileUtils.mkdir_p(File.dirname(CONFIG_PATH))
-        File.write(CONFIG_PATH, YAML.dump({ "anthropic_api_key" => key }))
-      end
-      key
-    end
-  end
-end
-```
-
-### AI can be disabled entirely
-
-```bash
-gaffer play --no-ai   # runs narrative-free, pure simulation
-```
-
-When `--no-ai` is passed (or no key is configured), the narrator adapter falls back to `Gaffer::Narrators::Template` — pre-written match report templates with interpolated stats. The game is fully playable without any API calls.
+There is **no** `gaffer config` command, **`--no-ai` flag**, or Anthropic client in this tree yet.
 
 ---
 
@@ -91,63 +52,54 @@ gaffer/
 │   └── gaffer                  # Executable entry point
 ├── lib/
 │   gaffer/
-│   ├── cli.rb                  # Thor command definitions
-│   ├── config.rb               # API key resolution
+│   ├── cli.rb                  # Thor: table, fixtures, scorers, next, start, console, version
 │   ├── database.rb             # Sequel connection + migrations
+│   ├── console.rb              # IRB entry
 │   │
-│   ├── domain/                 # Pure domain objects — no AI, no I/O
-│   │   ├── club.rb
-│   │   ├── player.rb
-│   │   ├── player_availability.rb  # Injury/suspension status per gameweek
-│   │   ├── league.rb
-│   │   ├── fixture.rb
-│   │   ├── fixture_generator.rb   # pure round-robin schedule (double home & away)
-│   │   ├── match.rb
-│   │   ├── match_engine.rb         # Deterministic simulation core
-│   │   ├── match_selection.rb      # Chosen XI + tactic for a fixture
-│   │   ├── save.rb                 # Root of a game state (manager + club + season)
-│   │   ├── manager.rb              # Manager name, club, save
-│   │   ├── scout_report.rb         # Derived opponent summary (template-based)
-│   │   ├── season.rb
-│   │   ├── transfer_market.rb
-│   │   └── tactics.rb
+│   ├── domain/                 # Pure domain — no ORM, no LLM calls
+│   │   ├── club.rb, player.rb, manager.rb, league.rb
+│   │   ├── fixture.rb, fixture_generator.rb, match.rb, match_result.rb
+│   │   ├── league_table.rb, table_row.rb
+│   │   ├── lineup.rb           # best XI (4-3-3) for sim + scout ratings
+│   │   ├── match_engine.rb     # Poisson sim, tactic multipliers, scout rating helper
+│   │   ├── scorer_picker.rb    # weighted goal scorers (same RNG as match)
+│   │   ├── goal_event.rb
+│   │   ├── scout_report.rb      # pre-match dossier value object
+│   │   └── scout_report_builder.rb  # aggregates DB → ScoutReport
 │   │
-│   ├── narrators/              # AI adapter pattern
-│   │   ├── base.rb             # Interface definition
-│   │   ├── claude.rb           # Anthropic implementation
-│   │   ├── openai.rb           # Optional OpenAI implementation
-│   │   └── template.rb         # Fallback — no API required
+│   ├── narratives/             # Template copy only (no API)
+│   │   ├── board_expectations.rb    # onboarding board letter (`board_target`)
+│   │   └── scout_briefing.rb        # conversational paragraphs from ScoutReport
 │   │
-│   ├── presenters/             # TTY rendering layer
-│   │   ├── league_table.rb
-│   │   ├── match_report.rb
-│   │   ├── squad_selector.rb       # Interactive XI picker
-│   │   ├── scout_report.rb         # Opponent lowdown display
-│   │   ├── squad_view.rb
-│   │   └── dashboard.rb
+│   ├── presenters/             # TTY output
+│   │   ├── matchday_squad.rb, league_table_tty.rb, league_table_view.rb
+│   │   ├── season_fixtures_tty.rb, top_scorers_tty.rb
+│   │   └── scout_briefing_tty.rb   # full-screen scout + keypress before dugout
 │   │
-│   └── commands/               # One file per CLI command
-│       ├── new_game.rb             # Save setup: name → league → club
-│       ├── next_fixture.rb         # Scout → pick team → play
-│       ├── play_match.rb           # Match simulation + result display
-│       ├── manage_squad.rb
-│       ├── transfer_window.rb
-│       └── press_conference.rb
+│   ├── repositories/           # Sequel persistence
+│   │   └── … club, player, manager, league, fixture, match, goal_event
+│   │
+│   ├── commands/
+│   │   ├── start_league.rb, next_fixture.rb, play_match.rb
+│   │   ├── league_standings.rb, season_fixtures.rb, top_scorers.rb
+│   │   └── support/season_lookup.rb
+│   │
+│   └── ui/
+│       ├── menu.rb             # Interactive loop
+│       └── onboarding.rb       # First-run manager + club
 │
 ├── db/
-│   ├── migrations/
-│   └── seeds/                  # Seed data: leagues, clubs, players
+│   ├── migrations/             # 001–007 incl. leagues, managers, goal_events
+│   └── seeds/                  # fictional_ten_teams.rb (10 clubs)
 │
 ├── test/
-│   ├── domain/
-│   ├── narrators/
-│   ├── prompts/
-│   └── support/
-│       ├── fake_narrator.rb    # Fake narrator for use in tests
-│       └── fixtures.rb         # Shared test data helpers
+│   ├── domain/, commands/, narratives/, …
+│   └── manual/
 │
 └── CLAUDE.md                   # This file
 ```
+
+> **Roadmap artifacts not in-repo yet:** `lib/gaffer/narrators/`, `lib/gaffer/config.rb`, AI prompts folder — Claude.md still describes intended patterns for those.
 
 ---
 
@@ -264,18 +216,29 @@ Match {
   fixture_id:      Integer
   home_score:      Integer
   away_score:      Integer
-  home_possession: Integer   # percentage (future)
+  home_possession: Integer   # percentage (unused in UI yet)
   home_shots:      Integer   # future
   home_shots_ot:   Integer   # future
   away_shots:      Integer   # future
   away_shots_ot:   Integer   # future
-  events:          JSON      # goals, cards, subs — future
-  player_ratings:  JSON      # { player_id => rating } — future
-  narrative:       Text      # AI-generated match report — future
+  events:          JSON      # reserved — future cards/subs timeline
+  player_ratings:  JSON      # future
+  narrative:       Text      # future AI layer
+}
+
+# goal_events — migration 007; one row per goal (scorer auditing + top scorers)
+GoalEvent {
+  id:         Integer
+  fixture_id: Integer
+  player_id:  Integer
+  club_id:    Integer       # scorer's club when the ball hit the net
+  side:       String       # "home" | "away"
 }
 ```
 
 > **DB note:** the `fixtures` table has a `season_id` column (from migration 003). We treat this as `league_id` at the Ruby layer and alias it in `FixtureRepository`. A future migration can rename the column once SQLite tooling allows it cleanly.
+
+Goal **scorers** for each match come from **`Domain::ScorerPicker`** (weighted by shooting / pace / dribbling × position) and persist via **`Repositories::GoalEventRepository`** alongside the `matches` row. `MatchResult` carries `home_scorers` / `away_scorers` as `Array<Player>` for UI.
 
 ---
 
@@ -293,9 +256,9 @@ One manager row per SQLite file (single-save slot for now). The active league is
 
 ---
 
-### MatchSelection
+### MatchSelection *(planned — not in DB or CLI persistence yet)*
 
-The player's chosen XI and tactic for a specific fixture, persisted so past decisions are reviewable.
+The player's chosen XI and tactic for a specific fixture — **reviewable snapshots** once implemented.
 
 ```ruby
 MatchSelection {
@@ -310,9 +273,9 @@ MatchSelection {
 
 ---
 
-### PlayerAvailability
+### PlayerAvailability *(planned)*
 
-Tracks injury and suspension state per player per gameweek. Absence is the exception — a missing row means the player is available.
+Tracks injury and suspension state per player per gameweek. Absence would be the exception — a missing row means available **when this exists**.
 
 ```ruby
 PlayerAvailability {
@@ -325,68 +288,58 @@ PlayerAvailability {
 }
 ```
 
-Injury logic: after each match, each outfield player has a 7% chance of picking up a knock (1–3 gameweeks out). GKs 4%. Suspensions triggered at 5 yellows or a red card.
+**Not implemented yet.** Intended injury logic sketch: ~7% per outfield knock (1–3 GW), ~4% GKs; suspensions from cards.
 
 ---
 
-### ScoutReport
+### Scout report (implemented)
 
-A derived value object — not persisted, computed fresh before each fixture from the opponent's current squad data.
+Pre-match dossier assembled from **SQLite only** — no LLM.
+
+**Building blocks**
+
+- **`Domain::ScoutReportBuilder`** — `build(opponent_club:, managed_club:, league_id:, gameweek:, hosting_managed:, engine:)`
+  - Table: **`LeagueTable`** + **`FixtureRepository#settled_scores_for_season`** → opponent **position**, **points**, **games played**, same for **managed** club for comparison copy.
+  - **Form**: last five **`:w`/`:d`/`:l`** for the opponent, chronological subset of settled results (`recent_form_for`).
+  - **Ratings**: best XI (`Lineup.pick_best_xi`) → **`MatchEngine#attack_defense_rating_for_xi`** (balanced effective attack/defence, reputation-scaled — same internals as simulate, minus tactics/RNG).
+  - **Goals**: **`GoalEventRepository#totals_by_player`** scoped to opponent → **`top_scorer`** `{ player:, goals: }` or nil.
+  - **`watch_focus`**: if they have league goals → top scorer; else best **live-wire** outfield (shooting/pace/dribbling) or **enforcer** defender fallback.
 
 ```ruby
+# Core fields on Domain::ScoutReport — see scout_report.rb
 ScoutReport {
-  opponent:         Club
-  overall_rating:   Integer          # avg overall of their best XI
-  strengths:        Array<String>    # e.g. ["Dangerous from set pieces", "Strong GK"]
-  weaknesses:       Array<String>    # e.g. ["Slow fullbacks", "Poor aerial defending"]
-  likely_tactic:    Symbol           # inferred from club reputation + recent form
-  key_players:      Array<Player>    # top 3 by overall
-  recent_form:      Array<Symbol>    # last 5 results e.g. [:w, :w, :d, :l, :w]
+  opponent:, managed_club:, gameweek:, hosting_managed:,
+  league_position:, league_size:, played:,
+  manager_league_position:, manager_played:, manager_points:, opponent_points:,
+  recent_form:,           # [:w/:d/:l …] oldest→newest inside last five
+  attack_rating:, defence_rating:,              # opponent XI
+  our_attack_rating:, our_defence_rating:,    # managed XI same formula
+  top_scorer:,            # Hash or nil
+  watch_focus:            # Hash { player:, kind: (:scorer | :livewire | :enforcer), goals: }
 }
 ```
 
-Scout report generation is purely template-based (no AI). Strengths and weaknesses are derived from attribute comparisons against league averages:
+**Narrative layer**
 
-```ruby
-module Gaffer
-  class ScoutReportBuilder
-    THRESHOLDS = {
-      pace_threat:      { attribute: :pace,       position: :att, threshold: 78 },
-      aerial_strength:  { attribute: :physical,   position: :def, threshold: 75 },
-      creative_mid:     { attribute: :passing,    position: :mid, threshold: 76 },
-      weak_fullbacks:   { attribute: :defending,  position: :def, threshold: 62 },
-      strong_gk:        { attribute: :goalkeeping,position: :gk,  threshold: 76 }
-    }
+- **`Gaffer::Narratives::ScoutBriefing.paragraphs(report)`** — rule-based conversational paragraphs (league narrative, form band, stylistic tilt, watch-player line, outlook).
+- **`Presenters::ScoutBriefingTty.present`** — clears screen, headings + pastel body, **`TTY::Prompt#keypress`** (or prints a skip line in non-interactive tests).
 
-    def build(opponent_squad)
-      strengths  = []
-      weaknesses = []
+**Flow in `gaffer next`** (see Commands::NextFixture)
 
-      THRESHOLDS.each do |trait, config|
-        avg = positional_avg(opponent_squad, config[:position], config[:attribute])
-        if avg >= config[:threshold]
-          strengths << trait_label(trait, :strength)
-        elsif avg <= config[:threshold] - 14
-          weaknesses << trait_label(trait, :weakness)
-        end
-      end
-
-      ScoutReport.new(
-        overall_rating: best_xi_avg(opponent_squad),
-        strengths:,
-        weaknesses:,
-        likely_tactic: infer_tactic(opponent_squad),
-        key_players: top_players(opponent_squad, 3),
-        recent_form: recent_form(opponent_squad)
-      )
-    end
-  end
-end
-```
+1. Validates league + fixture + squad.  
+2. Builds **`ScoutReport`**, renders **`ScoutBriefingTty`** (scout **before** dugout).  
+3. **`resolve_manager_lineup`** — Matchday squad table, accept/edit XI, compact refresh before tactics.  
+4. Tactic picker (managed side); sim whole gameweek; persist matches + **`goal_events`**.
 
 ---
 
-### Transfer
+### Onboarding — board expectations (implemented)
+
+First hire uses **`Gaffer::Narratives::BoardExpectations`** — template letters keyed by **`Club#board_target`** (`avoid_relegation` … `:title`), no AI. Driven from **`Ui::Onboarding`** after manager row is saved.
+
+---
+
+### Transfer *(planned — no `transfers` table)*
 
 ```ruby
 Transfer {
@@ -402,77 +355,45 @@ Transfer {
 
 ---
 
-## The Match Engine (Deterministic Core)
+## Seeded Data
 
-The `MatchEngine` produces a statistically plausible result from two squads and their tactics. **No AI involved.** Fast, testable, deterministic given a seed.
-
-```ruby
-module Gaffer
-  class MatchEngine
-    # Returns a MatchResult value object
-    def simulate(home_squad, away_squad, home_tactic, away_tactic, seed: nil)
-      rng = seed ? Random.new(seed) : Random.new
-
-      home_attack  = squad_attack_rating(home_squad, home_tactic)
-      home_defense = squad_defense_rating(home_squad, home_tactic)
-      away_attack  = squad_attack_rating(away_squad, away_tactic)
-      away_defense = squad_defense_rating(away_squad, away_tactic)
-
-      home_xg = calculate_xg(home_attack, away_defense, home_advantage: true, rng:)
-      away_xg = calculate_xg(away_attack, home_defense, home_advantage: false, rng:)
-
-      home_goals = sample_goals(home_xg, rng)
-      away_goals = sample_goals(away_xg, rng)
-
-      events      = generate_events(home_goals, away_goals, home_squad, away_squad, rng)
-      ratings     = generate_ratings(home_squad, away_squad, home_goals, away_goals, events, rng)
-
-      MatchResult.new(
-        home_score: home_goals,
-        away_score: away_goals,
-        home_possession: calculate_possession(home_attack, away_attack, rng),
-        events:,
-        player_ratings: ratings
-      )
-    end
-
-    private
-
-    def calculate_xg(attack, defense, home_advantage:, rng:)
-      base    = attack.to_f / (attack + defense)
-      base   += 0.05 if home_advantage
-      base   += rng.rand(-0.08..0.08)   # variance
-      [base * 3.5, 0].max               # scale to realistic xG range
-    end
-
-    def sample_goals(xg, rng)
-      # Poisson sampling
-      l = Math.exp(-xg)
-      k, p = 0, 1.0
-      loop do
-        k += 1
-        p *= rng.rand
-        break if p <= l
-      end
-      k - 1
-    end
-  end
-end
-```
-
-**Tactic modifiers:**
-
-| Tactic         | Attack modifier | Defense modifier |
-|----------------|-----------------|------------------|
-| `:all_out_attack` | +28%         | −28%             |
-| `:attacking`   | +12%            | −12%             |
-| `:balanced`    | —               | —                |
-| `:defensive`   | −12%            | +12%             |
-| `:park_the_bus`| −28%            | +28%             |
+The default seed is **`db/seeds/fictional_ten_teams.rb`**: **10 fictional clubs** (short codes `CRW` … `MBW`), **~23 players per club**, tiered reputation / `board_target` / chairman fields. **`rake db:seed`** loads clubs + players only — **league start** (`StartLeague` / menu) generates fixtures at runtime and links `clubs.league_id` to the new league row.
 
 ---
 
-## The Narrator Adapter
+## The Match Engine (Deterministic Core)
+
+See **`lib/gaffer/domain/match_engine.rb`**. Summary:
+
+- **Entry:** `simulate(home_club:, home_players:, away_club:, away_players:, home_tactic:, away_tactic:, seed:)` — keyword args, **11-player XIs** required.
+- **Flow:** per-player attack/defence contribution averages → **club reputation** scaling → **tactic multipliers** → Poisson goal counts from λ → **`ScorerPicker.pick`** fills **`MatchResult#home_scorers` / `away_scorers`** from the same `Random` stream.
+- **Public helper:** `attack_defense_rating_for_xi(club:, players:)` — balanced effective ratings (no RNG) for scout copy.
+
+```ruby
+MatchResult = Data.define(
+  :home_score, :away_score,
+  :home_xg_lambda, :away_xg_lambda,
+  :home_attack_rating, :home_defense_rating,
+  :away_attack_rating, :away_defense_rating,
+  :home_scorers, :away_scorers   # Array<Player>
+)
+```
+
+**Tactic modifiers** (attack / defence multipliers):
+
+| Tactic         | Attack | Defence |
+|----------------|--------|---------|
+| `:all_out_attack` | ×1.28 | ×0.72 |
+| `:attacking`   | ×1.12 | ×0.88 |
+| `:balanced`    | ×1.0  | ×1.0  |
+| `:defensive`   | ×0.88 | ×1.12 |
+| `:park_the_bus`| ×0.72 | ×1.28 |
+
+---
+
+## The Narrator Adapter *(planned / not wired in this repo yet)*
+
+The blocks below describe the **intended** AI adapter layout. There is no `lib/gaffer/narrators/` in the tree today — match output is template + data.
 
 ```ruby
 # lib/gaffer/narrators/base.rb
@@ -536,9 +457,9 @@ end
 
 ---
 
-## Prompt Design
+## Prompt Design *(planned — `lib/gaffer/prompts/` not in-repo yet)*
 
-Prompts live in `lib/gaffer/prompts/` as dedicated classes. They are version-controlled, testable, and treated as first-class code.
+When narrators ship, prompts should live under `lib/gaffer/prompts/` as dedicated classes — version-controlled, testable strings.
 
 ### Match Report Prompt
 
@@ -589,11 +510,12 @@ lib/gaffer/prompts/
 | Feature                  | AI? | Rationale                                              |
 |--------------------------|-----|--------------------------------------------------------|
 | Match simulation         | ❌  | Deterministic, fast, testable, free                   |
-| Match report narrative   | ✅  | High value, one call per match, user sees it directly |
-| Press conference Q&A     | ✅  | Core fun mechanic, user-initiated                     |
-| Transfer negotiation text| ✅  | Flavour, user-initiated                               |
-| Opponent manager logic   | ❌  | Rules-based with personality modifiers                |
-| League table / stats     | ❌  | Pure data                                             |
+| Match report narrative   | 🔜  | Planned narrator call per match                       |
+| Press conference Q&A     | 🔜  | Planned; no `gaffer press` yet                        |
+| Transfer negotiation text| 🔜  | Planned with transfer market                         |
+| Opponent manager logic   | ❌  | Rules-based with personality modifiers (future)       |
+| League table / stats / fixtures / scorers (`gaffer table`, `fixtures`, `scorers`) | ❌ | Pure data |
+| Pre-match scout briefing & board letter | ❌ | Template narratives from DB + `board_target` |
 | Player morale changes    | ❌  | Formula-based                                         |
 | Board confidence updates | ❌  | Formula-based                                         |
 
@@ -602,93 +524,57 @@ lib/gaffer/prompts/
 ## CLI Commands
 
 ```bash
-gaffer new          # Create a new save
-gaffer next         # Play your next fixture (main game loop)
-gaffer squad        # View current squad + availability
-gaffer table        # Current league standings
-gaffer fixtures     # Full fixture list with results
-gaffer season       # Season overview: form, board mood, targets
-gaffer transfers    # Open transfer market (in window)
-gaffer press        # Trigger a press conference (uses AI)
-gaffer config       # Manage API key and settings
+gaffer start        # Default — main menu (TTY); onboarding on first run
+gaffer next         # Play upcoming league gameweek (full round simulated)
+gaffer table        # Standings — `--previous` / `--year` for archives
+gaffer fixtures     # Fixtures & results — same archive flags
+gaffer scorers      # Top 20 scorers chart — same archive flags
+gaffer console      # IRB + DB
+gaffer version
 ```
+
+The menu also exposes **Play game** (`Commands::PlayMatch`) — friendly vs foil club, not the league loop.
 
 ---
 
 ## Core Game Flow
 
-### `gaffer new` — New Save
+### First run / menu — onboarding
+
+On **`gaffer start`** (or default Thor task), if no manager row exists:
 
 ```
-1. Enter your manager name
-2. Pick a league           (TTY select list)
-3. Pick a club             (TTY select list, shows reputation + board target)
-4. Season fixtures generated automatically (round-robin home/away)
-5. Confirmation screen:
-   ─────────────────────────────────────────
-   Welcome, [Name].
-   You've taken charge of [Club].
-   The board expect: [target].
-   First fixture: [Opponent] — Gameweek 1
-   ─────────────────────────────────────────
+1. Enter manager display name
+2. Pick a club (from DB — seeded clubs with reputation on the label)
+3. Manager row saved; board letter from BoardExpectations (board_target copy, no AI)
+4. Keypress → main menu
 ```
+
+There is no separate `gaffer new` Thor task today — save creation is this onboarding path.
 
 ---
 
-### `gaffer next` — Next Fixture (main loop)
+### `gaffer next` — Next gameweek (league loop)
 
 ```
-Step 1 — Fixture header
-  "Gameweek 12 · Home · Arsenal vs Chelsea"
-  Current league position + last 5 form
-
-Step 2 — Scout report
-  Opponent overall rating
-  Key strengths (2–3 bullet points)
-  Key weaknesses (2–3 bullet points)
-  Likely tactic
-  Players to watch (top 3 by overall)
-
-Step 3 — Squad selection
-  Suggested best XI shown (highest available overall by position)
-  Player shows: name / position / overall / form / availability
-  Prompt: "Accept this lineup? [Y/n]"
-  If no → interactive swap: pick position to change → pick replacement from available squad
-
-Step 4 — Tactic selection
-  Select from: All Out Attack / Attacking / Balanced / Defensive / Park the Bus
-  Brief description of each shown inline
-
-Step 5 — Confirmation
-  Final XI displayed in formation shape
-  Tactic shown
-  "Ready? [Enter to kick off]"
-
-Step 6 — Match
-  Simulates via MatchEngine
-  Key events printed as they "happen" (with short sleep between for effect)
-  e.g. "⚽ 23' — Saka fires past the keeper. Arsenal 1–0 Chelsea"
-       "🟨 45' — Gallagher booked for a late challenge"
-
-Step 7 — Full time
-  Final score + match stats (possession, shots, shots on target)
-  Player ratings table
-  Updated league table snippet (your club ± 2 positions either side)
-  "Press [Enter] for next fixture"
+1. Validate active league, unplayed round, squads (11+ players for managed club).
+2. Scout screen (clears terminal)
+   • Conversational briefing: table vs you, form band, attack/defence read, watch player
+   • Keypress → continue
+3. Dugout (MatchdaySquad)
+   • Gameweek header, opposition name, full roster table, suggested XI
+   • "Start with this XI? [Y/n]" or slot-by-slot edits
+   • After confirm: screen refresh — compact XI only ("Squad list hidden")
+4. Tactic picker (managed side only; CPU uses :balanced in league sims today)
+5. Transaction: simulate every fixture in the gameweek
+   • Managed match: user XI + chosen tactic
+   • Others: best XI + balanced
+   • Persist matches, goal_events, mark fixtures played, bump league.current_gameweek
+6. Post-round UI: your result (scoreline, scorers, λ), other scorelines, standings snapshot or final table
+7. End of season: complete league, optional Start Season [Y+1]
 ```
 
----
-
-## Seeded Data
-
-The game ships with seed data for one fully playable league:
-
-- **English Premier League** (20 clubs, ~500 players)
-- Clubs seeded with reputation, budget, board target
-- Players seeded with realistic attribute distributions per club tier
-- Fixtures generated programmatically (home/away round robin)
-
-Seed data lives in `db/seeds/` as Ruby scripts (not raw SQL) for readability.
+**Not yet in `gaffer next`:** live event ticker with sleeps, possession/shots in match output (engine focuses on score + scorers + λ today).
 
 ---
 
@@ -699,64 +585,33 @@ Minitest with the `minitest/spec` DSL throughout. No RSpec, no VCR.
 **Domain logic — pure unit tests, no mocking needed:**
 
 ```ruby
-# test/domain/match_engine_test.rb
-require "test_helper"
-
-describe Gaffer::MatchEngine do
-  let(:engine) { Gaffer::MatchEngine.new }
-
-  it "produces plausible scorelines for evenly matched teams" do
-    result = engine.simulate(avg_squad, avg_squad, :balanced, :balanced, seed: 42)
-    _(result.home_score + result.away_score).must_be :<=, 10
-  end
-
-  it "gives home teams a slight advantage over many simulations" do
-    results = 200.times.map { engine.simulate(avg_squad, avg_squad, :balanced, :balanced) }
-    home_wins = results.count { |r| r.home_score > r.away_score }
-    _(home_wins).must_be :>, 60  # expect >30% home wins
-  end
-
-  it "applies park the bus tactic defensively" do
-    defensive = engine.simulate(strong_squad, avg_squad, :park_the_bus, :balanced, seed: 42)
-    attacking = engine.simulate(strong_squad, avg_squad, :all_out_attack, :balanced, seed: 42)
-    _(defensive.home_score).must_be :<=, attacking.home_score
-  end
-end
+# Real coverage: test/domain/match_engine_test.rb — keyword args, Domain:: namespace, 23-player XIs.
+# Typical call:
+engine.simulate(
+  home_club: home_club, home_players: home_xi,
+  away_club: away_club, away_players: away_xi,
+  home_tactic: :balanced, away_tactic: :park_the_bus,
+  seed: 12_341
+)
+# Assertions include: same seed → identical MatchResult#to_h; scorer array lengths == goals; tactic ordering.
 ```
 
-**Narrator tests — swap in the Fake narrator, block real HTTP with WebMock:**
+**Narrator tests** — when narrators ship: swap in a Fake implementation, block real HTTP with WebMock (`test_helper` already requires WebMock).
 
 ```ruby
-# test/support/fake_narrator.rb
+# Intended pattern — not wired in test_helper today
 module Gaffer
   module Narrators
     class Fake < Base
       def match_report(fixture:, result:, home_club:, away_club:)
-        "#{home_club.name} #{result.home_score}–#{result.away_score} #{away_club.name}. A tightly contested match."
-      end
-
-      def press_conference(question:, context:)
-        "We gave everything out there. The lads were brilliant."
-      end
-
-      def transfer_response(player:, offer:, club:)
-        "We appreciate the interest but the player is not for sale."
+        "#{home_club.name} #{result.home_score}–#{result.away_score} #{away_club.name}."
       end
     end
   end
 end
-
-# test/test_helper.rb
-require "minitest/autorun"
-require "minitest/spec"
-require "webmock/minitest"  # blocks all real HTTP — no accidental API calls
-require "support/fake_narrator"
-
-# Use fake narrator by default in all tests
-Gaffer.narrator = Gaffer::Narrators::Fake.new
 ```
 
-**Prompt tests — pure string assertions, no HTTP involved:**
+**Prompt tests** *(when prompt classes exist)* — pure string assertions, no HTTP:
 
 ```ruby
 # test/prompts/match_report_test.rb
@@ -780,7 +635,7 @@ describe Gaffer::Prompts::MatchReport do
 end
 ```
 
-**The Claude narrator itself is not unit tested** — its behaviour is non-deterministic by nature. Instead, there is a manual smoke test script:
+**Smoke test** *(when Claude narrator + Config exist)* — not run in CI:
 
 ```ruby
 # test/smoke/narrator_test.rb  (not run in CI)
@@ -811,84 +666,44 @@ puts "Smoke test passed."
 
 ---
 
-### Phase 1b — League & Season (next up)
+### Phase 1b — League & season ✅ (core loop shipped)
 
-#### Decisions
+#### Decisions *(unchanged)*
+
 - **No separate Season model.** A League row *is* a season. Each year = a new League row.
-- **10 seeded clubs** (bye-free weeks). All load from **`db/seeds/fictional_ten_teams.rb`**; league start does **not** add/remove clubs from the roster.
-- **18 gameweeks** full home+away (**90** fixtures total, **5** matches per gameweek).
-- **User triggers season start** — fixtures are generated at runtime, not by `rake db:seed`.
-- **Only the managed club's match is "played"** in the UI; the **other four** gameweek matches auto-simulate silently.
-- **All fixtures played → auto end-of-season** (final table + prompt to start next year).
+- **10 seeded clubs**. **`db/seeds/fictional_ten_teams.rb`**; league start does **not** add/remove clubs.
+- **18 gameweeks** full home+away (**90** fixtures, **5** per round).
+- **User triggers season start** — fixtures generated at runtime via **`StartLeague`**, not `rake db:seed`.
+- **Managed match** is interactive (scout → XI → tactic); **other four** in the round auto-sim (best XI, `:balanced`).
+- **All rounds played** → end-of-season flow (complete league, optional next year).
 
-#### Implementation steps (in order)
+#### Implementation status
 
-**Step 1 — Seed data ✅**
-- **`db/seeds/fictional_ten_teams.rb`** — ten clubs in five loosely paired tiers (deterministic procedural squads, **23 players** each).
-- Canonical short codes: `CRW STB KLF VPK AHU RCT FAB LAN HCY MBW`. Skip/aborted-on-partial behaviour unchanged.
+| Step | Status | Notes |
+|------|--------|--------|
+| Seed + leagues + `FixtureGenerator` | ✅ | Migrations through **`007`** (`goal_events` for scorers) |
+| **`Commands::StartLeague`** | ✅ | Menu when no active league |
+| **`gaffer next`** | ✅ | `NextFixture`: scout briefing → dugout → tactic → full-GW transaction, `goal_events` |
+| **`gaffer table` / `fixtures` / `scorers`** | ✅ | Archive flags `--previous` / `--year` |
+| End-of-season + roll forward | ✅ | As in `NextFixture` / `LeagueRepository` |
 
-**Step 2 — `leagues` migration + domain model** ✅ (partially: table + repo; `clubs.league_id` already exists from migration 001)
-- Migration `006_create_leagues.rb`: `id`, `name`, `year` (integer), `status` (string), `current_gameweek` (integer, default 1)
-- ~~Migration `007_add_league_id_to_clubs`~~ — **not needed:** `clubs.league_id` is already in schema 001 (nullable, indexed)
-- `Domain::League` struct: `id`, `name`, `year`, `status` (symbol), `current_gameweek`
-- `Repositories::LeagueRepository`: `find(id)`, `active`, `save(league)`, `complete!(id)`, `latest_year`
-
-**Step 3 — `Domain::FixtureGenerator` ✅**
-- ~~Takes~~ `FixtureGenerator.generate(club_ids:, league_id:)` returns `Array<Fixture>` (`id` nil, `played` false, `season_id` = league row id)
-- Circle-method round-robin for first `(n−1)` gameweeks + same slots with flipped home/away for the return `(n−1)` gameweeks
-- Covered by **`test/domain/fixture_generator_test.rb`** (requires even `n ≥ 2`, distinct ids)
-
-**Step 4 — `Commands::StartLeague`**
-- Guard: refuse if a league is already `:active`
-- Determine year: `LeagueRepository.latest_year + 1` (default 2026 if none)
-- Create League row (`:pending`)
-- Assign all clubs `league_id` → new league
-- Generate fixtures via `FixtureGenerator`, bulk-insert to DB
-- Mark league `:active`, `current_gameweek: 1`
-- Print: `"Season 2026 is underway. Gameweek 1 of 18. First fixture: [date]"`
-- Add "Start new season" to main menu (only shown when no active league)
-
-**Step 5 — `gaffer next` command**
-- Find the manager's next unplayed fixture for the active league (`FixtureRepository.next_for_club`)
-- If none exists and league is active → trigger end-of-season (see Step 7)
-- Simulate the managed club's match; display result to screen
-- Auto-simulate the **other four fixtures** in the same gameweek (silent — save results, no output)
-- Mark all **five** fixtures in the round `played: true`, save Match rows
-- Advance `league.current_gameweek += 1`
-- Print: your scoreline + the **other four** results as a brief summary
-- Print: your current league position (`gaffer table` inline summary — top 3 + your row)
-- Add "Next fixture" to main menu (only shown when a league is active)
-
-**Step 6 — `gaffer table` command**
-- Query all played fixtures for the active league
-- Build `TableRow` per club (W/D/L/GF/GA/GD/Pts) — pure derived calculation, never persisted
-- Sort by points desc, then GD desc, then GF desc
-- Render with `tty-table` (columns: Pos · Club · P · W · D · L · GF · GA · GD · Pts)
-- Managed club row highlighted (bold or colour marker)
-
-**Step 7 — End-of-season detection**
-- After advancing `current_gameweek`, check: `current_gameweek > 18` (all rounds played)
-- If complete: `LeagueRepository.complete!(id)`; show full final table with managed club highlighted
-- Prompt: `"Start Season [year+1]? [Y/n]"` — Yes → `StartLeague`; No → return to menu
-
-#### Out of scope for Phase 1b
-- Tactic selection (all matches use `:balanced`)
-- Squad selection / best XI
-- Injuries / suspensions
-- Board reactions / sack mechanic
-- Transfer window
+**Still intentionally out of scope here:** transfers table, morale board/sack loops, persisted `match_selections`, injuries.
 
 ---
 
-### Phase 2 — Match Day Detail
-- [ ] Tactic selection before each fixture (All Out Attack / Attacking / Balanced / Defensive / Park the Bus)
-- [ ] `gaffer squad` — squad list with position, overall, form
-- [ ] `gaffer fixtures` — full fixture list with results for the active league
-- [ ] Post-match: brief scoreline + your league position after every result
-- [ ] Injury system: 7% chance per outfield player per match (1–3 GW out), 4% for GKs
+### Phase 2 — Match-day depth *(partial)*
 
-### Phase 3 — AI Narrative Layer
-- [ ] Anthropic client + Claude narrator
+- [x] Tactic selection before the managed fixture (`gaffer next`)
+- [x] Interactive XI in dugout (`MatchdaySquad`), refresh after lock-in
+- [x] `gaffer fixtures` for the active / archived league
+- [x] Post-round standings snippet + top scorers command (`gaffer scorers`, cap 20)
+- [ ] Standalone **`gaffer squad`** (browse roster outside match loop)
+- [ ] Injury / suspension system (`PlayerAvailability` + match hooks)
+- [ ] Live event ticker, possession/shots in post-match UI (columns exist on `matches`, mostly unused)
+
+### Phase 3 — AI narrative layer *(not started)*
+
+- [ ] Add `anthropic` gem + `Gaffer::Config` resolution
 - [ ] Match report prompt v1 (replaces plain scoreline output)
 - [ ] Press conference command (`gaffer press`)
 - [ ] Config / BYOK setup (`gaffer config`)
@@ -924,6 +739,6 @@ The README should lead with:
 - No Rails. Pure Ruby + Sequel. Keep dependencies minimal and intentional.
 - Domain objects are plain Ruby — no ORM coupling in `domain/`
 - Sequel repositories handle persistence separately from domain logic
-- All prompts are classes with a `.build` method returning a plain string
+- When prompt classes exist, prefer a **`.build` → String`** API
 - Never rescue broadly — let errors surface in development
 - `bin/gaffer` is the only executable; everything else is `require`-able as a library
