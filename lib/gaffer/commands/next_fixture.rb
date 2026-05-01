@@ -3,7 +3,9 @@
 require "pastel"
 
 require_relative "../domain/lineup"
+require_relative "../domain/scout_report_builder"
 require_relative "../presenters/matchday_squad"
+require_relative "../presenters/scout_briefing_tty"
 
 module Gaffer
   module Commands
@@ -114,6 +116,17 @@ module Gaffer
           hosting_tmp = managed_next.home_club_id.to_i == mid_tmp
 
           managed_club = clubs_by_id.fetch(managed_club_id)
+
+          scout_report =
+            Domain::ScoutReportBuilder.build(
+              opponent_club: clubs_by_id.fetch(opp_id_tmp.to_i),
+              managed_club: managed_club,
+              league_id: league.id,
+              gameweek: gameweek,
+              hosting_managed: hosting_tmp
+            )
+
+          Presenters::ScoutBriefingTty.present(scout_report, pastel: pastel, out: out, prompt: prompt)
 
           user_xi =
             resolve_manager_lineup(
@@ -230,6 +243,7 @@ module Gaffer
             out: out, pastel: pastel, club: club, gameweek: gameweek,
             opponent: opponent, hosting: hosting
           )
+
           Presenters::MatchdaySquad.print_roster_note(out: out, pastel: pastel)
           Presenters::MatchdaySquad.print_full_squad_table(out: out, pastel: pastel, players: full_squad)
           Presenters::MatchdaySquad.print_xi_heading(out: out, pastel: pastel)
@@ -240,7 +254,13 @@ module Gaffer
             return xi
           end
 
-          return xi if prompt.yes?(pastel.bold("Start with this XI?"), default: true)
+          if prompt.yes?(pastel.bold("Start with this XI?"), default: true)
+            refresh_dugout_after_xi_locked(
+              out: out, pastel: pastel, club: club, gameweek: gameweek,
+              opponent: opponent, hosting: hosting, xi: xi
+            )
+            return xi
+          end
 
           unless prompt.respond_to?(:select)
             out.puts pastel.dim("TTY select unavailable — keeping suggested XI.")
@@ -286,7 +306,16 @@ module Gaffer
             xi[slot_idx] = replacement
           end
 
-          # Editing path: squad table was handy for swaps; tuck it away so tactics step isn’t drowned out.
+          refresh_dugout_after_xi_locked(
+            out: out, pastel: pastel, club: club, gameweek: gameweek,
+            opponent: opponent, hosting: hosting, xi: xi
+          )
+
+          xi
+        end
+
+        # Clear roster table noise after XI is settled (default yes or swap loop exit).
+        def refresh_dugout_after_xi_locked(out:, pastel:, club:, gameweek:, opponent:, hosting:, xi:)
           out.print("\e[2J\e[H")
           Presenters::MatchdaySquad.print_heading(
             out: out, pastel: pastel, club: club, gameweek: gameweek,
@@ -295,8 +324,6 @@ module Gaffer
           out.puts pastel.dim("Squad list hidden — XI locked.")
           Presenters::MatchdaySquad.print_xi_heading(out: out, pastel: pastel)
           Presenters::MatchdaySquad.print_xi_lines(out: out, pastel: pastel, xi: xi)
-
-          xi
         end
 
         def ensure_db_connected

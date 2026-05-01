@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "../narratives/board_expectations"
+
 module Gaffer
   module Ui
     module Onboarding
@@ -38,9 +40,19 @@ module Gaffer
           managed_club_id: club.id
         )
 
+        note = Narratives::BoardExpectations.message(club: club, manager_name: nm)
+
         out.puts
         out.puts pastel.green.bold("#{nm}, you're in the hot seat.")
-        out.puts pastel.dim("Crowd expects results at #{club.name}. No pressure.")
+        out.puts
+        out.puts pastel.dim("─" * 52)
+        out.puts pastel.bold.white("Letter from the board")
+        note.split(/\n\n+/).map(&:strip).each do |para|
+          out.puts
+          out.puts para
+        end
+        out.puts
+        out.puts pastel.dim("─" * 52)
         out.puts
         prompt.keypress(pastel.dim("Press any key for the main menu…"))
       end

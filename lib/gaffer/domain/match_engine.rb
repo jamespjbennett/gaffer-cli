@@ -75,6 +75,14 @@ module Gaffer
         )
       end
 
+      # Effective attack/defence ratings for an XI exactly as `:balanced` would apply (no RNG) — scouting / UI only.
+      # @return [Array(Float, Float)] attack, defence
+      def attack_defense_rating_for_xi(club:, players:)
+        atk = apply_club_quality(squad_mean(players, :attack), club.reputation)
+        defw = apply_club_quality(squad_mean(players, :defense), club.reputation)
+        [atk, defw]
+      end
+
       private
 
       def tactic_mult(tactic, axis)
