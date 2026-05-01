@@ -9,6 +9,16 @@ module Gaffer
           row ? row_to_domain(row) : nil
         end
 
+        # @param short [String] normalised with +strip+ then +upcase+
+        # @return [Domain::Club, nil]
+        def find_by_short_name(short)
+          norm = short.to_s.strip.upcase
+          return nil if norm.empty?
+
+          row = clubs_ds.where(short_name: norm).first
+          row ? row_to_domain(row) : nil
+        end
+
         def all
           clubs_ds.order(:name).map { row_to_domain(_1) }
         end

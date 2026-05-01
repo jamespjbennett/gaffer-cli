@@ -4,7 +4,7 @@ require "pastel"
 
 require_relative "start_league"
 require_relative "../domain/lineup"
-require_relative "../domain/scout_report_builder"
+require_relative "support/scout_report_builder"
 require_relative "../ui/dugout_lineup"
 require_relative "../presenters/scout_briefing_tty"
 require_relative "../presenters/league_table_tty"
@@ -118,7 +118,7 @@ module Gaffer
           managed_club = clubs_by_id.fetch(managed_club_id)
 
           scout_report =
-            Domain::ScoutReportBuilder.build(
+            Support::ScoutReportBuilder.build(
               opponent_club: clubs_by_id.fetch(opp_id_tmp.to_i),
               managed_club: managed_club,
               league_id: league.id,

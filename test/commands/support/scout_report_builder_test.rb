@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require_relative "../test_helper"
+require_relative "../../test_helper"
 require "fileutils"
 require "pastel"
 require "securerandom"
@@ -10,7 +10,7 @@ require "gaffer/database"
 require "gaffer"
 require "gaffer/commands/start_league"
 require "gaffer/commands/next_fixture"
-require "gaffer/domain/scout_report_builder"
+require "gaffer/commands/support/scout_report_builder"
 
 class ScoutReportDecliningPrompt
   def yes?(*)
@@ -18,7 +18,7 @@ class ScoutReportDecliningPrompt
   end
 end
 
-describe Gaffer::Domain::ScoutReportBuilder do
+describe Gaffer::Commands::Support::ScoutReportBuilder do
   def insert_club(name:, short:)
     Gaffer::Database.db[:clubs].insert(
       name: name,
@@ -58,7 +58,7 @@ describe Gaffer::Domain::ScoutReportBuilder do
 
   before do
     Gaffer::Database.disconnect if Gaffer::Database.connection
-    @tmp_path = File.join(File.dirname(__dir__), "..", "tmp", "gaffer_scout_#{SecureRandom.hex(6)}.sqlite")
+    @tmp_path = File.join(File.dirname(__dir__), "..", "..", "tmp", "gaffer_scout_#{SecureRandom.hex(6)}.sqlite")
     FileUtils.mkdir_p(File.dirname(@tmp_path))
     FileUtils.rm_f(@tmp_path)
     ENV["GAFFER_DB_PATH"] = File.expand_path(@tmp_path)
@@ -103,14 +103,14 @@ describe Gaffer::Domain::ScoutReportBuilder do
         { home_club_id: 2, away_club_id: 3, home_score: 1, away_score: 1 },
         { home_club_id: 3, away_club_id: 2, home_score: 0, away_score: 3 }
       ]
-      f = Gaffer::Domain::ScoutReportBuilder.recent_form_for(opponent_club_id: 2, chronological_results: rows)
+      f = Gaffer::Commands::Support::ScoutReportBuilder.recent_form_for(opponent_club_id: 2, chronological_results: rows)
       _(f).must_equal %i[l d w]
     end
   end
 
   describe ".build" do
     def build_for_opp
-      Gaffer::Domain::ScoutReportBuilder.build(
+      Gaffer::Commands::Support::ScoutReportBuilder.build(
         opponent_club: @opp_club,
         managed_club: Gaffer::Repositories::ClubRepository.find(@mgr_club_id),
         league_id: @league.id,
@@ -150,7 +150,7 @@ describe Gaffer::Domain::ScoutReportBuilder do
         club_id: @mgr_club_id
       ).gameweek.to_i
 
-      r = Gaffer::Domain::ScoutReportBuilder.build(
+      r = Gaffer::Commands::Support::ScoutReportBuilder.build(
         opponent_club: @opp_club,
         managed_club: Gaffer::Repositories::ClubRepository.find(@mgr_club_id),
         league_id: @league.id,

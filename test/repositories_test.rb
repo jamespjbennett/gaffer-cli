@@ -52,6 +52,31 @@ describe "Repositories" do
         _(Repo.find(before.id).chairman_mood).must_equal :satisfied
       end
     end
+
+    it "find_by_short_name normalises casing" do
+      with_isolated_database do
+        repo = Gaffer::Repositories::ClubRepository
+
+        repo.save(
+          Gaffer::Domain::Club.new(
+            name: "United Town",
+            short_name: "UNT",
+            league_id: 1,
+            reputation: 50,
+            budget: 0,
+            wage_budget: 0,
+            stadium: "Lane",
+            chairman_name: "X",
+            chairman_mood: :okay,
+            board_target: :mid_table
+          )
+        )
+
+        got = repo.find_by_short_name("unt")
+        _(got&.short_name).must_equal "UNT"
+        _(repo.find_by_short_name("  ")).must_be_nil
+      end
+    end
   end
 
   describe Gaffer::Repositories::PlayerRepository do

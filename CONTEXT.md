@@ -18,7 +18,7 @@ Vocabulary for architecture and product discussions. Authoritative game rules an
 
 ## Match day (league loop)
 
-- **Scout briefing** — Pre-match dossier: **ScoutReport** from DB-only **ScoutReportBuilder**, rendered by template narrative + **ScoutBriefingTty** (before dugout).
+- **Scout briefing** — Pre-match dossier: **Domain::ScoutReport** assembled by **Commands::Support::ScoutReportBuilder** (DB reads), rendered by template narrative + **ScoutBriefingTty** (before dugout).
 - **Dugout** — **Ui::DugoutLineup** runs the XI prompts and edit loop; **Presenters::MatchdaySquad** only renders tables/lines; suggested XI from **Lineup.pick_best_xi**.
 - **Tactic** / **shape** — One of **MatchEngine** tactic keys (e.g. balanced, park the bus); CPU sides use balanced in the league loop today.
 - **Gameweek play** — One transaction: simulate every fixture in the round, persist **matches** and **goal_events**, mark fixtures played, bump **current_gameweek** (and complete the league on the final round). Orchestrated by **GameweekPlay**; **NextFixture** is the CLI entry that ensures DB bootstrap then delegates.
@@ -34,7 +34,7 @@ Vocabulary for architecture and product discussions. Authoritative game rules an
 - **Domain** — Plain Ruby objects and pure logic; no ORM types in model structs (repositories map rows ↔ domain).
 - **Repositories** — Sequel-backed persistence for clubs, players, fixtures, matches, leagues, etc.
 - **Database.prepare** — Default app bootstrap (`Gaffer::Database.prepare`): connects to SQLite (ENV path, default file, or optional Sequel URL when not yet connected) and runs migrations. Use at CLI/menu/console/command entry unless you deliberately need a lighter path (e.g. tests that only `#disconnect`).
-- **Commands** — User-facing operations (Thor tasks and menu): **StartLeague**, **NextFixture**, **PlayMatch**, standings/fixtures/scorers, etc.
+- **Commands** — User-facing operations (Thor tasks and menu): **StartLeague**, **NextFixture**, **PlayMatch**, standings/fixtures/scorers, etc. **`Commands::Support::LeagueReads`** delegates `gaffer table|fixtures|scorers` and the menu’s matching actions so **`SeasonLookup`** and archive picker behaviour stay single-sourced.
 - **Presenters** — TTY formatting (tables, scout screen, matchday squad).
 - **Narrators** *(planned)* — LLM adapter seam for match copy; not shipped yet.
 

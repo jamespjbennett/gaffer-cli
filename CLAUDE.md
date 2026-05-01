@@ -65,7 +65,6 @@ gaffer/
 │   │   ├── scorer_picker.rb    # weighted goal scorers (same RNG as match)
 │   │   ├── goal_event.rb
 │   │   ├── scout_report.rb      # pre-match dossier value object
-│   │   └── scout_report_builder.rb  # aggregates DB → ScoutReport
 │   │
 │   ├── narratives/             # Template copy only (no API)
 │   │   ├── board_expectations.rb    # onboarding board letter (`board_target`)
@@ -82,7 +81,7 @@ gaffer/
 │   ├── commands/
 │   │   ├── start_league.rb, next_fixture.rb, play_match.rb
 │   │   ├── league_standings.rb, season_fixtures.rb, top_scorers.rb
-│   │   └── support/season_lookup.rb
+│   │   └── support/season_lookup.rb, scout_report_builder.rb, league_reads.rb
 │   │
 │   └── ui/
 │       ├── menu.rb             # Interactive loop
@@ -298,7 +297,7 @@ Pre-match dossier assembled from **SQLite only** — no LLM.
 
 **Building blocks**
 
-- **`Domain::ScoutReportBuilder`** — `build(opponent_club:, managed_club:, league_id:, gameweek:, hosting_managed:, engine:)`
+- **`Commands::Support::ScoutReportBuilder`** — `build(opponent_club:, managed_club:, league_id:, gameweek:, hosting_managed:, engine:)`
   - Table: **`LeagueTable`** + **`FixtureRepository#settled_scores_for_season`** → opponent **position**, **points**, **games played**, same for **managed** club for comparison copy.
   - **Form**: last five **`:w`/`:d`/`:l`** for the opponent, chronological subset of settled results (`recent_form_for`).
   - **Ratings**: best XI (`Lineup.pick_best_xi`) → **`MatchEngine#attack_defense_rating_for_xi`** (balanced effective attack/defence, reputation-scaled — same internals as simulate, minus tactics/RNG).
@@ -327,8 +326,8 @@ ScoutReport {
 **Flow in `gaffer next`** (see Commands::NextFixture)
 
 1. Validates league + fixture + squad.  
-2. Builds **`ScoutReport`**, renders **`ScoutBriefingTty`** (scout **before** dugout).  
-3. **`resolve_manager_lineup`** — Matchday squad table, accept/edit XI, compact refresh before tactics.  
+2. Builds **`Domain::ScoutReport`** (via **`Support::ScoutReportBuilder`**), renders **`ScoutBriefingTty`** (scout **before** dugout).  
+3. **`Ui::DugoutLineup`** — dugout XI prompts + compact refresh before tactics.  
 4. Tactic picker (managed side); sim whole gameweek; persist matches + **`goal_events`**.
 
 ---

@@ -15,16 +15,13 @@ module Gaffer
     def table(*)
       require_relative "../gaffer"
       require "pastel"
-      require_relative "commands/league_standings"
+      require_relative "commands/support/league_reads"
 
-      yr = options[:year]
-      yr = Integer(yr) unless yr.nil?
-
-      Gaffer::Commands::LeagueStandings.run(
+      Gaffer::Commands::Support::LeagueReads.from_cli_standings(
         pastel: Pastel.new,
         out: $stdout,
         previous: options[:previous],
-        year: yr
+        year: options[:year]
       )
     end
 
@@ -37,16 +34,13 @@ module Gaffer
     def fixtures(*)
       require_relative "../gaffer"
       require "pastel"
-      require_relative "commands/season_fixtures"
+      require_relative "commands/support/league_reads"
 
-      yr = options[:year]
-      yr = Integer(yr) unless yr.nil?
-
-      Gaffer::Commands::SeasonFixtures.run(
+      Gaffer::Commands::Support::LeagueReads.from_cli_fixtures(
         pastel: Pastel.new,
         out: $stdout,
         previous: options[:previous],
-        year: yr
+        year: options[:year]
       )
     end
 
@@ -59,16 +53,13 @@ module Gaffer
     def scorers(*)
       require_relative "../gaffer"
       require "pastel"
-      require_relative "commands/top_scorers"
+      require_relative "commands/support/league_reads"
 
-      yr = options[:year]
-      yr = Integer(yr) unless yr.nil?
-
-      Gaffer::Commands::TopScorers.run(
+      Gaffer::Commands::Support::LeagueReads.from_cli_scorers(
         pastel: Pastel.new,
         out: $stdout,
         previous: options[:previous],
-        year: yr
+        year: options[:year]
       )
     end
 

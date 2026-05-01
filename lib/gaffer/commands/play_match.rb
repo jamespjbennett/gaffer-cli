@@ -68,11 +68,7 @@ module Gaffer
 
         # @return [Gaffer::Domain::Club, nil]
         def resolve_away_foil_club(home)
-          sn = foil_short(home.short_name)
-          row = Gaffer::Database.db[:clubs].where(short_name: sn.upcase).first
-          return nil unless row
-
-          Repositories::ClubRepository.find(row[:id])
+          Repositories::ClubRepository.find_by_short_name(foil_short(home.short_name))
         end
 
         # @return [SquadPair, nil] nil if either side has no players
