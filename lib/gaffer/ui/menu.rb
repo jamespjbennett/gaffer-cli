@@ -16,6 +16,9 @@ module Gaffer
     module Menu
       module_function
 
+      MAIN_MENU_TITLE = "What would you like to do?"
+      RETURN_TO_MENU_HINT = "Press any key to return to the menu…"
+
       def run
         pastel = Pastel.new
         prompt = TTY::Prompt.new
@@ -32,74 +35,83 @@ module Gaffer
 
         loop do
           print "\e[2J\e[H"
-          out = $stdout
+          break if main_menu_iteration(pastel:, prompt:, out: $stdout)
+        end
+      end
 
-          mgr = Repositories::ManagerRepository.current
-          club =
-            mgr && Repositories::ClubRepository.find(mgr.managed_club_id)
+      def main_menu_iteration(pastel:, prompt:, out:)
+        mgr = Repositories::ManagerRepository.current
+        club = mgr && Repositories::ClubRepository.find(mgr.managed_club_id)
+        out.puts render_header(pastel, manager: mgr, managed_club: club)
+        out.puts
 
-          out.puts render_header(pastel, manager: mgr, managed_club: club)
-          out.puts
+        archived = Repositories::LeagueRepository.completed_ordered
+        choice = prompt.select(MAIN_MENU_TITLE) { |menu| register_main_choices(menu, archived) }
+        return true if quitting?(choice, pastel, out)
 
-          completed_rows = Repositories::LeagueRepository.completed_ordered
+        dispatch_menu_choice(choice, pastel:, prompt:, out:)
+        false
+      end
 
-          choice = prompt.select("What would you like to do?") do |menu|
-            menu.choice "Next fixture · league day", :next_fixture if Repositories::LeagueRepository.active
-            menu.choice "League table", :league_table if Repositories::LeagueRepository.active
-            menu.choice "Fixtures & results", :season_fixtures if Repositories::LeagueRepository.active
-            menu.choice "Top scorers", :top_scorers if Repositories::LeagueRepository.active
-            menu.choice "Archived league table…", :archived_league_table unless completed_rows.empty?
-            menu.choice "Archived fixtures…", :archived_season_fixtures unless completed_rows.empty?
-            menu.choice "Play game", :play
-            menu.choice "Start new season", :start_league unless Repositories::LeagueRepository.active
-            menu.choice "Quit", :quit
-          end
+      def register_main_choices(menu, archived_seasons)
+        active = Repositories::LeagueRepository.active
+        append_active_league_choices(menu) if active
+        append_archived_choices(menu, archived_seasons)
+        menu.choice "Play game", :play
+        menu.choice "Start new season", :start_league unless active
+        menu.choice "Quit", :quit
+      end
 
-          case choice
-          when :next_fixture
-            out.puts
-            Gaffer::Commands::NextFixture.run(pastel:, out: out, prompt: prompt)
-            out.puts
-            prompt.keypress(pastel.dim("Press any key to return to the menu…"))
-          when :archived_league_table
-            out.puts
-            Gaffer::Commands::Support::LeagueReads.from_menu_standings_archive(pastel:, out:, prompt:)
-            out.puts
-            prompt.keypress(pastel.dim("Press any key to return to the menu…"))
-          when :league_table
-            out.puts
-            Gaffer::Commands::Support::LeagueReads.from_menu_standings_active(pastel:, out: out)
-            out.puts
-            prompt.keypress(pastel.dim("Press any key to return to the menu…"))
-          when :season_fixtures
-            out.puts
-            Gaffer::Commands::Support::LeagueReads.from_menu_fixtures_active(pastel:, out: out)
-            out.puts
-            prompt.keypress(pastel.dim("Press any key to return to the menu…"))
-          when :top_scorers
-            out.puts
-            Gaffer::Commands::Support::LeagueReads.from_menu_scorers_active(pastel:, out: out)
-            out.puts
-            prompt.keypress(pastel.dim("Press any key to return to the menu…"))
-          when :archived_season_fixtures
-            out.puts
-            Gaffer::Commands::Support::LeagueReads.from_menu_fixtures_archive(pastel:, out:, prompt:)
-            out.puts
-            prompt.keypress(pastel.dim("Press any key to return to the menu…"))
-          when :start_league
-            out.puts
-            Gaffer::Commands::StartLeague.run(pastel:, out: out)
-            out.puts
-            prompt.keypress(pastel.dim("Press any key to return to the menu…"))
-          when :play
-            out.puts
-            Gaffer::Commands::PlayMatch.run(pastel:, out: out)
-            out.puts
-            prompt.keypress(pastel.dim("Press any key to return to the menu…"))
-          when :quit
-            out.puts pastel.dim("Goodbye.")
-            break
-          end
+      def append_active_league_choices(menu)
+        menu.choice "Next fixture · league day", :next_fixture
+        menu.choice "League table", :league_table
+        menu.choice "Fixtures & results", :season_fixtures
+        menu.choice "Top scorers", :top_scorers
+      end
+
+      def append_archived_choices(menu, archived_seasons)
+        return if archived_seasons.empty?
+
+        menu.choice "Archived league table…", :archived_league_table
+        menu.choice "Archived fixtures…", :archived_season_fixtures
+      end
+
+      def quitting?(choice, pastel, out)
+        return false unless choice == :quit
+
+        out.puts pastel.dim("Goodbye.")
+        true
+      end
+
+      def dispatch_menu_choice(choice, pastel:, prompt:, out:)
+        with_return_pause(pastel, prompt, out) { invoke_menu_action(choice, pastel:, prompt:, out:) }
+      end
+
+      def with_return_pause(pastel, prompt, out)
+        out.puts
+        yield
+        out.puts
+        prompt.keypress(pastel.dim(RETURN_TO_MENU_HINT))
+      end
+
+      def invoke_menu_action(choice, pastel:, prompt:, out:)
+        case choice
+        when :next_fixture
+          Gaffer::Commands::NextFixture.run(pastel:, out:, prompt:)
+        when :archived_league_table
+          Gaffer::Commands::Support::LeagueReads.from_menu_standings_archive(pastel:, out:, prompt:)
+        when :league_table
+          Gaffer::Commands::Support::LeagueReads.from_menu_standings_active(pastel:, out:)
+        when :season_fixtures
+          Gaffer::Commands::Support::LeagueReads.from_menu_fixtures_active(pastel:, out:)
+        when :top_scorers
+          Gaffer::Commands::Support::LeagueReads.from_menu_scorers_active(pastel:, out:)
+        when :archived_season_fixtures
+          Gaffer::Commands::Support::LeagueReads.from_menu_fixtures_archive(pastel:, out:, prompt:)
+        when :start_league
+          Gaffer::Commands::StartLeague.run(pastel:, out:)
+        when :play
+          Gaffer::Commands::PlayMatch.run(pastel:, out:)
         end
       end
 
