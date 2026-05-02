@@ -118,6 +118,7 @@ describe Gaffer::Commands::NextFixture do
     _(log.string).must_match(/Your starting XI/)
     _(log.string).must_match(/\b4-3-3\b/)
     _(log.string).must_match(/Scout/)
+    _(log.string).must_match(/Coach ·/)
     _(log.string).must_match(/Gameweek 1/)
   end
 

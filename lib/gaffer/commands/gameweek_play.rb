@@ -76,8 +76,13 @@ module Gaffer
               gameweek: state.gameweek,
               hosting_managed: state.hosting_managed
             )
+          coaching =
+            Support::ScoutReportBuilder.build_coaching_context(
+              managed_club: state.managed_club,
+              managed_xi: state.suggested_xi
+            )
 
-          Presenters::ScoutBriefingTty.present(scout, pastel:, out:, prompt:)
+          Presenters::ScoutBriefingTty.present(scout, coaching:, pastel:, out:, prompt:)
         end
 
         def dugout_selection(manager_lineup:, prompt:, pastel:, out:, state:)

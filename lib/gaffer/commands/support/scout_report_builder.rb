@@ -8,6 +8,7 @@ require_relative "scout_xi_ratings"
 require_relative "scout_top_scorer_lookup"
 require_relative "scout_recent_form"
 require_relative "scout_watch_focus"
+require_relative "scout_coaching_notables"
 
 module Gaffer
   module Commands
@@ -46,6 +47,12 @@ module Gaffer
           # @return [Array<Symbol>] last five :w, :d, :l from opponent POV (oldest first among those five)
           def recent_form_for(opponent_club_id:, chronological_results:)
             ScoutRecentForm.last_five(opponent_club_id:, chronological_results:)
+          end
+
+          # @param managed_xi [Array<Domain::Player>] suggested XI before dugout tweaks
+          # @return [Domain::CoachingContext]
+          def build_coaching_context(managed_club:, managed_xi:)
+            ScoutCoachingNotables.context(managed_club:, managed_xi:)
           end
 
           private
