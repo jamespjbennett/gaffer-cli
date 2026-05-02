@@ -111,6 +111,7 @@ module Gaffer
               )
             )
             Repositories::LeagueRepository.complete!(lid) if gw >= max_gw
+            Repositories::PlayerRepository.increment_age_for_league!(lid) if gw >= max_gw
           end
         end
       end

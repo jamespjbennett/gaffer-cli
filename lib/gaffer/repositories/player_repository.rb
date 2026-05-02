@@ -35,6 +35,11 @@ module Gaffer
           club_ids.each { |cid| soft_reset_club(cid) }
         end
 
+        def increment_age_for_league!(league_id)
+          sub = clubs_in_league(league_id)
+          players_ds.where(club_id: sub).update(age: Sequel.expr(:age) + 1)
+        end
+
         private
 
         def soft_reset_club(cid)
@@ -49,6 +54,10 @@ module Gaffer
 
         def apply_morale_form_pair(id, pair)
           players_ds.where(id: id).update(form: pair.fetch(:form), morale: pair.fetch(:morale).to_s)
+        end
+
+        def clubs_in_league(league_id)
+          db[:clubs].where(league_id: league_id.to_i).select(:id)
         end
 
         def players_ds

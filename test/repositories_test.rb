@@ -110,6 +110,41 @@ describe "Repositories" do
         _(repo_p.for_club(club.id).first.name).must_equal "Sam Bee"
       end
     end
+
+    it "increment_age_for_league! adds one year only where club.league_id matches" do
+      with_isolated_database do
+        repo_c = Gaffer::Repositories::ClubRepository
+        repo_p = Gaffer::Repositories::PlayerRepository
+        lg = 77
+        a = repo_c.save(Gaffer::Domain::Club.new(name: "Aged A", short_name: "AAA", league_id: lg))
+        b = repo_c.save(Gaffer::Domain::Club.new(name: "Other", short_name: "BBB", league_id: 66))
+        p_a =
+          repo_p.save(
+            Gaffer::Domain::Player.new(
+              name: "Youth",
+              age: 21,
+              nationality: "x",
+              position: :gk,
+              club_id: a.id,
+              wage: 1
+            )
+          )
+        p_b =
+          repo_p.save(
+            Gaffer::Domain::Player.new(
+              name: "Vet",
+              age: 32,
+              nationality: "z",
+              position: :gk,
+              club_id: b.id,
+              wage: 1
+            )
+          )
+        repo_p.increment_age_for_league!(lg)
+        _(repo_p.find(p_a.id).age).must_equal 22
+        _(repo_p.find(p_b.id).age).must_equal 32
+      end
+    end
   end
 
   describe Gaffer::Repositories::FixtureRepository do
