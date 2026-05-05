@@ -9,7 +9,7 @@ module Gaffer
         end
 
         def call
-          Tone.apply(core_message, ctx)
+          [Opening.block(ctx), Tone.apply(core_message, ctx)].reject(&:empty?).join("\n\n")
         end
 
         private

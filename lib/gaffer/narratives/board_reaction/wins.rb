@@ -42,8 +42,12 @@ module Gaffer
             "#{c.managed_goals}-#{c.opponent_goals} away against top-table opposition."
           end,
           handsome: ->(_c) { "Strong win. Deserved the margin on the day." },
-          scrape: ->(_c) { "Three points at home — take it, then sharpen the final third." },
-          default: ->(_c) { "Great result. Good to see us get the win." }
+          scrape: lambda do |_c|
+            "Three points banked — now raise the tempo in the final third before anyone gets comfortable."
+          end,
+          default: lambda do |_c|
+            "Solid shift all over the pitch. Keep standards high on the training ground this week."
+          end
         }.freeze
       end
     end

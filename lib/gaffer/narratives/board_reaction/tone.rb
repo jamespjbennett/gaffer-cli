@@ -1,67 +1,43 @@
 # frozen_string_literal: true
 
+require_relative "vibes"
+
 module Gaffer
   module Narratives
     module BoardReaction
+      # Chairman mood flake before the Opening paragraph; analytical lines stay untouched.
       module Tone
         extend self
 
-        def apply(core, ctx)
+        def lede(ctx)
           mood = ctx.managed_club.chairman_mood&.to_sym
-          pfx = prefix(mood, vibe(ctx))
-          "#{pfx}#{core}"
+          return "" if mood.nil?
+
+          RULES.fetch(mood, {}).fetch(tag(ctx), "")
+        end
+
+        def apply(core, _ctx)
+          core.to_s.strip
         end
 
         private
 
-        def vibe(ctx)
-          return :bright if bright_win?(ctx)
-          return :grim if grim_loss?(ctx)
-          return :soft if forgiving_loss?(ctx) && ctx.managed_loss?
-          return :flat if tepid_draw?(ctx)
+        def tag(ctx)
+          return :bright if Vibes.bright_win?(ctx)
+          return :grim if Vibes.grim_loss?(ctx)
+          return :soft if forgiving_loss_tag?(ctx)
+          return :flat if Vibes.tepid_draw?(ctx)
           :neutral
         end
 
-        def bright_win?(ctx)
-          ctx.managed_win? && (ctx.margin >= 3 || upset_win?(ctx))
-        end
-
-        def upset_win?(ctx)
-          !ctx.hosting_managed && ctx.opponent_strong?
-        end
-
-        def grim_loss?(ctx)
-          return false unless ctx.managed_loss?
-
-          !(forgiving_loss?(ctx) || narrow_loss_mid?(ctx))
-        end
-
-        def forgiving_loss?(ctx)
-          ctx.opponent_strong? && !ctx.hosting_managed && ctx.margin <= 1
-        end
-
-        def narrow_loss_mid?(ctx)
-          ctx.margin <= 1 && !ctx.hosting_managed && !ctx.opponent_weak?
-        end
-
-        def tepid_draw?(ctx)
-          drawn?(ctx) && ctx.hosting_managed && ctx.opponent_weak?
-        end
-
-        def drawn?(ctx)
-          ctx.managed_goals == ctx.opponent_goals
-        end
-
-        def prefix(mood, vibe_key)
-          return "" if mood.nil?
-
-          RULES.fetch(mood, {}).fetch(vibe_key, RULES.fetch(mood, {}).fetch(:neutral, ""))
+        def forgiving_loss_tag?(ctx)
+          ctx.managed_loss? && Vibes.forgiving_loss?(ctx)
         end
 
         RULES = {
           delighted: {
             neutral: "",
-            bright: "Brilliant afternoon — ",
+            bright: "Brilliant news — ",
             soft: "",
             flat: "",
             grim: ""
@@ -77,14 +53,14 @@ module Gaffer
             neutral: "",
             bright: "",
             soft: "",
-            flat: "We hoped for sharper work — ",
+            flat: "",
             grim: "Worrying signs — "
           },
           furious: {
             neutral: "",
             bright: "",
             soft: "",
-            flat: "Not what we pay for — ",
+            flat: "",
             grim: "Completely unacceptable — "
           }
         }.freeze

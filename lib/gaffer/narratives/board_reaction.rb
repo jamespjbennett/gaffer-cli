@@ -1,7 +1,9 @@
 # frozen_string_literal: true
 
 require_relative "board_reaction/context"
+require_relative "board_reaction/vibes"
 require_relative "board_reaction/tone"
+require_relative "board_reaction/opening"
 require_relative "board_reaction/wins"
 require_relative "board_reaction/draws"
 require_relative "board_reaction/losses"

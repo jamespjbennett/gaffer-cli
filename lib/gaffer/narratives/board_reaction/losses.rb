@@ -33,11 +33,22 @@ module Gaffer
         end
 
         PHRASES = {
-          battered: ->(_c) { "Heavy defeat — regroup quickly." },
-          away_elite_narrow: ->(_c) { "Narrow loss away to a leading side." },
-          home_weak: ->(_c) { "Lost at home to a struggling outfit." },
-          slender_away: ->(_c) { "One-nil away on a tricky pitch." },
-          default: ->(_c) { "Could not get anything from this one." }
+          battered: lambda do |_c|
+            "Conceded far too cheaply and never looked comfortable. " \
+            "Honest debrief required before walking out again."
+          end,
+          away_elite_narrow: lambda do |_c|
+            "Stayed in the contest on a tough ground. Margins were tiny — bottle that fight for the next trip."
+          end,
+          home_weak: lambda do |_c|
+            "No excuses for gifting lifelines at home. They expect far more steel and sharper ideas."
+          end,
+          slender_away: lambda do |_c|
+            "Denied by a thin margin on the road. Take the graft, then sharpen the decisive moments."
+          end,
+          default: lambda do |_c|
+            "Could not tilt the midfield or threaten consistently. Something has to spark before the next whistle."
+          end
         }.freeze
       end
     end

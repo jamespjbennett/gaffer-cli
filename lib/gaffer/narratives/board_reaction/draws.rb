@@ -30,10 +30,10 @@ module Gaffer
 
         PHRASES = {
           away_elite: lambda do |_c|
-            "Hard-earned point away to a top side — we'll take that."
+            "Those away points underline real character. Carry that belief into preparation."
           end,
           home_minnow: lambda do |_c|
-            "Only a draw at home to lower-table opposition."
+            "Supporters rightly expect bolder ideas at home. Address it quickly behind closed doors."
           end,
           edge_lost: lambda do |_c|
             "Dropped two points at home despite sitting above them in the table."

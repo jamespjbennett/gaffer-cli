@@ -28,6 +28,11 @@ describe Gaffer::Narratives::BoardReaction do
   it "home win to nil praises defence" do
     m = message_for(managed: mk_club(:us), opp: mk_club(:them), hs: 3, aos: 0,
       hosting: true, mgr_r: 6, opp_r: 8).downcase
+    _(m).must_include("today's")
+    _(m).must_include("3-0")
+    _(m).must_include("home")
+    _(m).must_include("victory")
+    _(m).must_include("against them")
     _(m).must_include("nil")
     _(m).must_include("back")
   end
@@ -35,23 +40,28 @@ describe Gaffer::Narratives::BoardReaction do
   it "narrow away defeat to top-three stays gentle" do
     m = message_for(managed: mk_club(:us), opp: mk_club(:top), hs: 1, aos: 0,
       hosting: false, mgr_r: 10, opp_r: 1).downcase
-    _(m).must_include("narrow")
+    _(m).must_include("1-0")
     _(m).must_include("away")
-    _(m).must_include("leading")
+    _(m).must_include("against top")
+    _(m).must_include("margins") # detail body
+    _(m).must_include("tough ground")
   end
 
   it "away draw at strong side earns credit" do
     m = message_for(managed: mk_club(:us), opp: mk_club(:top), hs: 0, aos: 0,
       hosting: false, mgr_r: 9, opp_r: 2).downcase
-    _(m).must_include("hard-earned")
-    _(m).must_include("top side")
+    _(m).must_include("0-0")
+    _(m).must_include("away draw")
+    _(m).must_include("character")
+    _(m).must_include("top")
   end
 
   it "heavy loss plus furious chairman sharpens greeting" do
     mui = mk_club(:us, mood: :furious)
     m = message_for(managed: mui, opp: mk_club(:them), hs: 4, aos: 0,
       hosting: false, mgr_r: 5, opp_r: 6)
-    _(m.downcase).must_include("heavy")
+    _(m.downcase).must_include("conced") # battered body copy
     _(m).must_include("unacceptable")
+    _(m.downcase).must_include("4-0")
   end
 end
