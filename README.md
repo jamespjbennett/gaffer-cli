@@ -51,6 +51,8 @@ bundle exec rake db:migrate
 
 ## CLI
 
+From the **`gaffer_cli`** directory:
+
 ```bash
 chmod +x bin/gaffer   # once, if checkout doesn't mark it executable
 ./bin/gaffer           # interactive menu (same as `./bin/gaffer start`)
@@ -62,20 +64,20 @@ chmod +x bin/gaffer   # once, if checkout doesn't mark it executable
 ./bin/gaffer console   # IRB + DB (alias: ./bin/gaffer c)
 ```
 
-Archive flags work on `table`, `fixtures`, and `scorers`:
+Archive flags (`table`, `fixtures`, `scorers`):
 
 ```bash
 ./bin/gaffer table --previous     # last completed season
 ./bin/gaffer table --year 2025    # a specific year
 ```
 
-Or open the console via Rake:
+Ruby console via Rake (from repo root):
 
 ```bash
 bundle exec rake console
 ```
 
-Inside the console, `db` is the live Sequel connection (`db.tables`, `db[:clubs].all`, …). Domain types live under `Gaffer::Domain`, persistence under `Gaffer::Repositories`.
+Inside IRB, `db` is the Sequel connection (`db.tables`, `db[:clubs].all`, …); domain objects live under `Gaffer::Domain`, persistence under `Gaffer::Repositories`.
 
 ---
 
@@ -88,7 +90,7 @@ Inside the console, `db` is the live Sequel connection (`db.tables`, `db[:clubs]
 3. A board letter is generated based on the club's target (`avoid_relegation` → `title`).
 4. Press any key → main menu.
 
-### `gaffer next` — league gameweek
+### `./bin/gaffer next` — league gameweek
 
 Each call plays **one full round** (all five fixtures in the gameweek):
 
