@@ -139,7 +139,33 @@ module Gaffer
         dump_lines(pastel, out, "You", report.managed_strength_lines + report.managed_weak_lines)
 
         dump_lines(pastel, out, "Them", report.opponent_strength_lines + report.opponent_weak_lines)
-        stars(report, pastel, out)
+        managed_squad_panel(report, pastel, out)
+      end
+
+      def managed_squad_panel(report, pastel, out)
+        out.puts pastel.bold("Your squad")
+        squad_row(out, pastel, "Playing well", report.managed_hot)
+        squad_row(out, pastel, "Struggling", report.managed_cold)
+      end
+
+      def squad_row(out, pastel, title, bundle)
+        out.puts stitched_row(pastel, title, bundle)
+      end
+
+      def stitched_row(pastel, title, bundle)
+        head = pastel.dim(format("  %-14s ", title))
+        nm = pastel.white(short_name(bundle[:player]))
+        tail = pastel.dim("  #{score_chip(bundle[:score])}")
+        head + nm + tail
+      end
+
+      def short_name(ply)
+        raw = ply&.name.to_s.strip
+        raw.empty? ? "—" : raw.slice(0, 26)
+      end
+
+      def score_chip(val)
+        format("%4.1f", val.to_f)
       end
 
       def dump_lines(pastel, out, tag, lines)
@@ -147,20 +173,6 @@ module Gaffer
         lines.take(6).each { |ln| out.puts pastel.white(" • #{ln}") }
 
         out.puts
-      end
-
-      def stars(report, pastel, out)
-        out.puts format_face(pastel, "Going well", report.managed_hot[:player])
-        out.puts format_face(pastel, "Having a tough one", report.managed_cold[:player])
-        out.puts format_face(pastel, "One to watch", report.opponent_hot[:player])
-        out.puts format_face(pastel, "Not at their best", report.opponent_cold[:player])
-      end
-
-      def format_face(pastel, tag, ply)
-        name = ply&.name.to_s.strip
-        nm = name.empty? ? "—" : name
-
-        pastel.dim("#{tag}: #{nm}")
       end
     end
   end

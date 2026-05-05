@@ -6,6 +6,7 @@ require_relative "support/gameweek_preflight"
 require_relative "support/gameweek_tactics"
 require_relative "support/gameweek_round_persist"
 require_relative "support/interactive_league_match"
+require_relative "support/gameweek_dugout_kw"
 require_relative "support/board_reaction_context"
 require_relative "support/gameweek_round_tty"
 require_relative "../ui/dugout_lineup"
@@ -52,9 +53,11 @@ module Gaffer
         private
 
         def play_round(pastel:, out:, prompt:, manager_tactic:, manager_lineup:, state:)
-          present_scouting(pastel:, out:, prompt:, state:)
+          scout, coaching = present_scouting(pastel:, out:, prompt:, state:)
 
-          xi = dugout_selection(manager_lineup:, prompt:, pastel:, out:, state:)
+          xi = dugout_selection(
+            manager_lineup:, prompt:, pastel:, out:, state:, scout:, coaching:
+          )
           unless xi&.size == 11
             out.puts pastel.red("Pick a legal XI (11 outfield + keeper distribution) before kicking off.")
             return :squads_incomplete
@@ -86,21 +89,14 @@ module Gaffer
             )
 
           Presenters::ScoutBriefingTty.present(scout, coaching:, pastel:, out:, prompt:)
+          [scout, coaching]
         end
 
-        def dugout_selection(manager_lineup:, prompt:, pastel:, out:, state:)
-          Ui::DugoutLineup.resolve(
-            preset: manager_lineup,
-            suggested_xi: state.suggested_xi,
-            full_squad: state.full_squad,
-            club: state.managed_club,
-            prompt: prompt,
-            pastel: pastel,
-            out: out,
-            gameweek: state.gameweek,
-            opponent: state.opponent_name_short,
-            hosting: state.hosting_managed
+        def dugout_selection(manager_lineup:, prompt:, pastel:, out:, state:, scout:, coaching:)
+          kw = Support::GameweekDugoutKw.resolve_args(
+            state:, scout:, coaching:, manager_lineup: manager_lineup
           )
+          Ui::DugoutLineup.resolve(prompt: prompt, pastel: pastel, out: out, **kw)
         end
 
         def tactic_for_manager(manager_tactic:, prompt:, pastel:, out:, state:)

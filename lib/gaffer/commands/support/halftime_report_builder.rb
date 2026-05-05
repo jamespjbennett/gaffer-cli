@@ -2,6 +2,7 @@
 
 require_relative "../../domain/halftime_report"
 require_relative "../../domain/player"
+require_relative "halftime_side_copy"
 
 module Gaffer
   module Commands
@@ -17,30 +18,39 @@ module Gaffer
 
         def from_runner(slice)
           snap = slice.snapshot
-          ml = tidy(slice.managed_label)
-          ol = tidy(slice.opponent_label)
-          m_key = slice.managed_home ? :home : :away
-          o_key = slice.managed_home ? :away : :home
-          mh, mc = hotcold(slice.runner, snap, m_key)
-          oh, oc = hotcold(slice.runner, snap, o_key)
+          keyed = axis_keys(slice.managed_home)
 
           Domain::HalftimeReport.new(
             snapshot: snap,
             managed_is_home: slice.managed_home,
-            managed_label: ml,
-            opponent_label: ol,
-            managed_hot: mh,
-            managed_cold: mc,
-            opponent_hot: oh,
-            opponent_cold: oc,
-            managed_strength_lines: praise(snap, m_key),
-            managed_weak_lines: fret(snap, m_key),
-            opponent_strength_lines: praise(snap, o_key),
-            opponent_weak_lines: fret(snap, o_key)
+            managed_label: tidy(slice.managed_label),
+            opponent_label: tidy(slice.opponent_label),
+            managed_hot: hotcorner(slice.runner, snap, keyed[:managed_axis]),
+            managed_cold: coldcorner(slice.runner, snap, keyed[:managed_axis]),
+            opponent_hot: hotcorner(slice.runner, snap, keyed[:opponent_axis]),
+            opponent_cold: coldcorner(slice.runner, snap, keyed[:opponent_axis]),
+            managed_strength_lines: praise(snap, keyed[:managed_axis], :managed),
+            managed_weak_lines: fret(snap, keyed[:managed_axis], :managed),
+            opponent_strength_lines: praise(snap, keyed[:opponent_axis], :opponent),
+            opponent_weak_lines: fret(snap, keyed[:opponent_axis], :opponent)
           )
         end
 
         private
+
+        def axis_keys(managed_home)
+          { managed_axis: managed_home ? :home : :away, opponent_axis: managed_home ? :away : :home }
+        end
+
+        # hotcold returned [max, min] before — split for clarity
+        def hotcorner(runner, snap, axis)
+          pair = hotcold(runner, snap, axis)
+          pair.first
+        end
+
+        def coldcorner(runner, snap, axis)
+          hotcold(runner, snap, axis).last
+        end
 
         def tidy(txt)
           s = txt.to_s.strip
@@ -52,10 +62,8 @@ module Gaffer
           ft = axis == :home ? snap.home_fatigue.to_a : snap.away_fatigue.to_a
           return [nil_wire, nil_wire] if xi.empty?
 
-          wired = xi.each_with_index.map { |(pl), i| mark(pl, ft, i) }
-          mx = wired.max_by { |(w)| w[:score] }
-          mn = wired.min_by { |(w)| w[:score] }
-          [stamp(mx), stamp(mn)]
+          wired = xi.each_with_index.map { |pl, i| mark(pl, ft, i) }
+          [stamp(wired.max_by { |w| w[:score] }), stamp(wired.min_by { |w| w[:score] })]
         end
 
         def nil_wire
@@ -96,53 +104,56 @@ module Gaffer
           0.0
         end
 
-        def praise(snap, axis)
+        def praise(snap, axis, side)
           st = snap.team_stats.fetch(axis)
-          perks = []
-          perks << chances_line(st[:big_chances]) if punchy?(st)
-          perks << possession_line(st[:possession]) if st[:possession].to_f >= 53.5
-          perks << goals_line(st) unless goals_line(st).nil?
-          perks.compact.take(3)
+          lines = perk_lines(st, side)
+          lines.compact.take(3)
+        end
+
+        def perk_lines(st, side)
+          acc = []
+          acc << HalftimeSideCopy.chances_big(st[:big_chances], side) if punchy?(st)
+          acc << HalftimeSideCopy.possession_good(st[:possession], side) if dom_poss?(st)
+          poke_goal(acc, st, side)
+          acc
+        end
+
+        def poke_goal(acc, st, side)
+          g = HalftimeSideCopy.goals_positive(st, side)
+          acc << g unless g.nil?
+        end
+
+        def dom_poss?(st)
+          st[:possession].to_f >= 53.5
         end
 
         def punchy?(st)
           Integer(st.fetch(:big_chances, 0)) >= 2
         end
 
-        def chances_line(bc)
-          "Caused real problems — #{bc} big chance#{'s' unless bc.to_i == 1} created."
-        end
-
-        def possession_line(poss)
-          "Bossing possession at #{poss}%."
-        end
-
-        def goals_line(st)
-          g = Integer(st.fetch(:goals, 0))
-          return unless g.positive?
-
-          g == 1 ? "Made it count — on the scoresheet." : "Made it count — #{g} goals to show for it."
-        end
-
-        def fret(snap, axis)
+        def fret(snap, axis, side)
           st = snap.team_stats.fetch(axis)
-          woes = []
-          woes << poor_possession_line(st) if st[:possession].to_f < 43.5
-          woes << low_shots_line if st.fetch(:shots, 0).to_i <= 2
-          woes << tired_line if weary?(snap, axis)
-          woes.compact.take(3)
+          fret_pack(st, snap, axis, side).compact.take(3)
         end
 
-        def poor_possession_line(st)
-          "Struggling to get a foothold — only #{st[:possession]}% of the ball."
+        def fret_pack(st, snap, axis, side)
+          w = []
+          w << HalftimeSideCopy.poor_touch(st, side) if low_poss?(st)
+          w << HalftimeSideCopy.low_shots(side) if few_shots?(st)
+          weary_push(w, snap, axis, side)
+          w
         end
 
-        def low_shots_line
-          "Barely got near their goal in the first half."
+        def weary_push(w, snap, axis, side)
+          w << HalftimeSideCopy.weary_xi(side) if weary?(snap, axis)
         end
 
-        def tired_line
-          "A few players will be feeling it — legs starting to go."
+        def low_poss?(st)
+          st[:possession].to_f < 43.5
+        end
+
+        def few_shots?(st)
+          st.fetch(:shots, 0).to_i <= 2
         end
 
         def weary?(snap, axis)

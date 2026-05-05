@@ -23,6 +23,29 @@ module Gaffer
         ScoutReportTty.render(report, pastel:, out:)
         body(Narratives::ScoutBriefing.paragraphs(report), pastel, out)
       end
+
+      def replay_dugout(report, pastel:, out:, coaching: nil, prompt: nil)
+        full_brief(report, pastel, out, coaching)
+        pause_return(prompt, pastel, out)
+      end
+
+      def full_brief(report, pastel, out, coaching)
+        prelude(report, pastel, out)
+        divider(pastel, out)
+        training(coaching, pastel, out) unless coaching.nil?
+        divider(pastel, out)
+      end
+
+      def pause_return(prompt, pastel, out)
+        return stdin_fallback(out, pastel) unless prompt&.respond_to?(:keypress)
+
+        prompt.keypress(pastel.dim("Press any key to return to XI selection…"))
+      end
+
+      def stdin_fallback(out, pastel)
+        out.puts pastel.dim("(non-interactive — returning to XI selection)")
+      end
+
       def wipe(out)
         out.print("\e[2J\e[H")
         out.puts
