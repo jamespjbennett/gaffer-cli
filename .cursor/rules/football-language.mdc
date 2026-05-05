@@ -1,6 +1,6 @@
 ---
 description: Natural British football language for all player-facing copy in Gaffer
-globs: lib/gaffer/narratives/**/*.rb,lib/gaffer/presenters/**/*.rb,lib/gaffer/commands/support/halftime_report_builder.rb
+globs: lib/gaffer/narratives/**/*.rb,lib/gaffer/presenters/**/*.rb,lib/gaffer/commands/support/halftime_report_builder.rb,lib/gaffer/commands/support/board_reaction_context.rb
 alwaysApply: false
 ---
 
@@ -47,7 +47,10 @@ Label as: "Going well: [name]" and "Having a tough one: [name]"
 Opponent equivalents: "One to watch: [name]" and "Not at their best: [name]"
 Drop the numeric score from display — it adds nothing to a football person.
 
-## Pre-match training notes (`CoachTrainingMatrix` / `CoachTrainingReport`)
+## Post-match board (`BoardReaction`)
+
+- One short paragraph. Chairman tone prefixes only when mood is `concerned` / `furious` (grim or flat fixtures).
+- No corporate speak; sound like a terse board note after watching the result.
 
 - Written as a real staff coach briefing: **pace, touch, shape, confidence, communication** — not poetry.
 - **Ban** training-ground theatrics: rondos/corridors, "radar on", "swagger", "purring", "red-hot", "menace", metaphors about machines.

@@ -6,9 +6,11 @@ require_relative "support/gameweek_preflight"
 require_relative "support/gameweek_tactics"
 require_relative "support/gameweek_round_persist"
 require_relative "support/interactive_league_match"
+require_relative "support/board_reaction_context"
 require_relative "support/gameweek_round_tty"
 require_relative "../ui/dugout_lineup"
 require_relative "../presenters/scout_briefing_tty"
+require_relative "../presenters/board_reaction_tty"
 
 module Gaffer
   module Commands
@@ -163,7 +165,21 @@ module Gaffer
             final_round: final_round,
             manager_shape: manager_shape
           )
+          board_pulse(pastel:, out:, prompt:, state:, summaries:)
           Support::GameweekRoundTty.offer_next_season(league: state.league, pastel:, out:, prompt:) if final_round
+        end
+
+        def board_pulse(pastel:, out:, prompt:, state:, summaries:)
+          bundle =
+            Support::BoardReactionContext.build(
+              state: state,
+              summaries: summaries,
+              managed_club_id: state.managed_club_id
+            )
+          return unless bundle
+
+          note = Narratives::BoardReaction.message(bundle)
+          Presenters::BoardReactionTty.present(note, pastel:, out:, prompt:)
         end
       end
     end
