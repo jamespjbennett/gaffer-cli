@@ -48,57 +48,56 @@ module Gaffer
 
       TABLE = [
         [ # unhappy
-          "%{name} looks completely out of sorts — brittle in every drill.",
-          "%{name}'s withdrawn; touch is heavy and concentration's shot.",
-          "%{name} going through motions — nowhere near settled.",
-          "%{name} flat despite trying; confidence looks paper-thin.",
-          "%{name}'s edgy — snapping at mates, not syncing with shape."
+          "%{name} looks well off it — miles from his best in training.",
+          "%{name}'s quiet on the ball — touch heavy, mind elsewhere.",
+          "%{name} looks like he's going through the motions; needs a proper chat.",
+          "%{name}'s flat — confidence is low.",
+          "%{name}'s on edge in drills — snappy with teammates, loses focus."
         ],
         [ # unsettled
-          "%{name}'s twitchy — good moments then switches off altogether.",
-          "%{name} drifting in and out — coach can't nail down a role yet.",
-          "%{name} okay in patches but sloppy when pressed.",
-          "%{name} eager but rushed; picks wrong option under pressure.",
-          "%{name}'s bubbling but loose — needs sharpening before Saturday."
+          "%{name} flashes quality then drops right out of it.",
+          "%{name} drifts in and out — still not settled on a role.",
+          "%{name}'s decent in spells but slack when we step up the press.",
+          "%{name} rushes it under pressure and picks the wrong pass.",
+          "%{name}'s keen but loose — needs tightening up before matchday."
         ],
         [ # okay
-          "%{name}'s ticking over — steady, nothing flashy.",
-          "%{name}'s alright; knows the patterns, just lacks zip.",
-          "%{name} reliable as ever in the shape — same pace as last week.",
-          "%{name} sharp enough; training matches what we ask on the board.",
-          "%{name}'s bright — training ground energy lifting the group."
+          "%{name}'s steady — nothing flashy, gets the job done.",
+          "%{name}'s where he should be but looks a yard short.",
+          "%{name}'s reliable in the shape — same level as last week.",
+          "%{name}'s alert; training matches what's on the board.",
+          "%{name}'s bright — dragging the tempo of the session."
         ],
         [ # happy
-          "%{name}'s chirpy — stepping into duels with a grin.",
-          "%{name}'s bouncing; link play with the tens looks crisp.",
-          "%{name}'s dialled in — first touch snapping, voice on the pitch.",
-          "%{name}'s flying; others are piggybacking on their tempo.",
-          "%{name}'s a step ahead — calling runs before the whistle goes."
+          "%{name}'s walking into challenges with real belief.",
+          "%{name}'s linking cleanly with the forwards.",
+          "%{name}'s first touch is clean and he's talking the side through it.",
+          "%{name}'s on the front foot — others are feeding off him.",
+          "%{name}'s reading the press early and setting the runs."
         ],
         [ # ecstatic
-          "%{name}'s untouchable in rondos — sheer menace this week.",
-          "%{name}'s purring; every corridor run opens the defence.",
-          "%{name}'s in that rare groove — body loose, radar on.",
-          "%{name}'s thriving — swagger without sloppiness, leaders follow them.",
-          "%{name}'s red-hot — real buzz about them, coaching staff grinning."
+          "%{name}'s running the show in the small-sided games.",
+          "%{name}'s a handful every time he's on the ball in training.",
+          "%{name}'s sharp and seeing passes before they open up.",
+          "%{name}'s in top form — confident, disciplined, leading by example.",
+          "%{name}'s flying; the staff have been impressed with him this week."
         ]
       ].freeze
 
-      # Cause-for-concern: form band only — avoids “happy morale + low form” sounding upbeat.
       FIELD_WORRY = [
-        "%{name}'s flat — chasing shadows when the whistle goes.",
-        "%{name}'s off the pace; first touch betraying them in tight spaces.",
-        "%{name}'s patchy — shape's there but urgency's dipped.",
-        "%{name}'s coasting compared to usual; staff want more edge.",
-        "%{name}'s not matching the group's tempo — drifting in possession."
+        "%{name} looks a step off — not getting close enough in drills.",
+        "%{name}'s sluggish — first touch lets him down in tight areas.",
+        "%{name}'s patchy and the urgency has dipped.",
+        "%{name} needs to find another gear compared to usual.",
+        "%{name}'s not matching the tempo — too loose on the ball."
       ].freeze
 
       GK_WORRY = [
-        "%{name}'s nervy coming for crosses — feet stuck, timing late.",
-        "%{name}'s distribution's sloppy; same lapse twice in drills.",
-        "%{name}'s positionally fine but command's waned — not organising the box.",
-        "%{name}'s save-hand sharp but kicking's gifting cheap turnovers.",
-        "%{name}'s quiet between the sticks — not driving the tempo from the back."
+        "%{name}'s tentative on crosses — late off his line.",
+        "%{name}'s kicking has been sloppy in training.",
+        "%{name}'s fine with shot-stoppers but not commanding his box.",
+        "%{name}'s safe with gloves on but careless with the ball at his feet.",
+        "%{name}'s too quiet organising the defenders in front of him."
       ].freeze
     end
   end

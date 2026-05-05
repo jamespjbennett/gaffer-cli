@@ -18,7 +18,7 @@ module Gaffer
       # Simulates every fixture in the round and bumps league state inside one DB transaction.
       module GameweekRoundPersist
         class << self
-          def run_transaction(state:, manager_shape:, user_xi:, summary_class:, engine:)
+          def run_transaction(state:, manager_shape:, user_xi:, summary_class:, engine:, interactive: nil)
             summaries = []
             mid = state.managed_club_id
 
@@ -36,7 +36,8 @@ module Gaffer
                   engine:,
                   summaries:,
                   summary_class:,
-                  morale_rows:
+                  morale_rows:,
+                  interactive:
                 )
               end
               apply_morale_rows(morale_rows, players_by_id, rng)
@@ -48,7 +49,12 @@ module Gaffer
 
           private
 
-          def persist_one_fixture(fx:, state:, mid:, manager_shape:, user_xi:, engine:, summaries:, summary_class:, morale_rows:)
+          def persist_one_fixture(fx:, state:, mid:, manager_shape:, user_xi:, engine:, summaries:, summary_class:, morale_rows:, interactive:)
+            if use_canned?(fx, interactive)
+              hydrate(fx:, canned: interactive.fetch(:outcome), summaries:, summary_class:, morale_rows:)
+              return
+            end
+
             home_tac, away_tac = GameweekTactics.tactics_pair_for(fixture: fx, managed_id: mid, shape: manager_shape)
             plan =
               GameweekRoundSim::Plan.new(
@@ -62,7 +68,36 @@ module Gaffer
                 managed_xi: user_xi
               )
             out = GameweekRoundSim.simulate_full(plan)
-            result = out.result
+            roll_fixture(
+              fx,
+              out.result,
+              summaries,
+              summary_class,
+              morale_rows,
+              out.morale_home_xi,
+              out.morale_away_xi
+            )
+          end
+
+          def use_canned?(fx, pack)
+            pack.is_a?(Hash) &&
+              fx.id.to_i == pack[:fixture_id].to_i &&
+              pack[:outcome].is_a?(GameweekRoundSim::SimulateOutcome)
+          end
+
+          def hydrate(fx:, canned:, summaries:, summary_class:, morale_rows:)
+            roll_fixture(
+              fx,
+              canned.result,
+              summaries,
+              summary_class,
+              morale_rows,
+              canned.morale_home_xi,
+              canned.morale_away_xi
+            )
+          end
+
+          def roll_fixture(fx, result, summaries, summary_class, morale_rows, mh, ma)
             Repositories::MatchRepository.save(GameweekRoundSim.build_match(fixture_id: fx.id, result:))
             Repositories::GoalEventRepository.save_batch(GameweekRoundSim.goal_events_for_fixture(fx, result))
             Repositories::FixtureRepository.save(GameweekRoundSim.fixture_played(fx))
@@ -70,10 +105,10 @@ module Gaffer
               Domain::MoraleRoundRow.new(
                 fixture: fx,
                 result: result,
-                home_xi: out.home_xi,
-                away_xi: out.away_xi
+                home_xi: mh,
+                away_xi: ma
               )
-            summaries << summary_class.new(fixture: fx, result:)
+            summaries << summary_class.new(fixture: fx, result: result)
           end
 
           def players_snapshot(state)

@@ -51,10 +51,10 @@ describe "Gaffer::Narratives::CoachTrainingReport" do
         falling: [pl(form: 1, morale: :unhappy, name: "DownPat")]
       )
     lines = Gaffer::Narratives::CoachTrainingReport.paragraphs(ctx)
-    _(lines.any?(/Coach notes · TST/)).must_equal true
-    _(lines).must_include("On the up:")
+    _(lines.any?(/Training notes · TST/)).must_equal true
+    _(lines).must_include("Sharp in training:")
     _(lines.any?(/UpPat/)).must_equal true
-    _(lines).must_include("Cause for concern:")
+    _(lines).must_include("Concern:")
     _(lines.any?(/DownPat/)).must_equal true
   end
 end
@@ -85,7 +85,7 @@ describe "Gaffer::Narratives::CoachTrainingMatrix" do
     s = Gaffer::Narratives::CoachTrainingMatrix.sentence(p)
     _(s).must_match(/^Ron/)
 
-    _(s.downcase).must_match(/looks completely out of sorts/)
+    _(s.downcase).must_match(/well off it|miles from his best/)
   end
 
   it "maps ecstatic + peak form" do
@@ -110,7 +110,7 @@ describe "Gaffer::Narratives::CoachTrainingMatrix" do
         contract_years: 3,
         wage: 5
       )
-    _(Gaffer::Narratives::CoachTrainingMatrix.sentence(p).downcase).must_match(/menace|red-hot/)
+    _(Gaffer::Narratives::CoachTrainingMatrix.sentence(p).downcase).must_match(/running the show|handful|flying|top form/)
   end
 
   it "worried band ignores ecstatic morale — form-only slump copy" do
@@ -164,7 +164,7 @@ describe "Gaffer::Narratives::CoachTrainingMatrix" do
         wage: 4
       )
     w = Gaffer::Narratives::CoachTrainingMatrix.sentence_for_band(p, :falling).downcase
-    _(w).must_match(/crosses|distribution|organising the box|between the sticks|turnovers/)
+    _(w).must_match(/crosses|kicking|commanding|organising|ball at his feet/)
     _(w).wont_include("corridor")
   end
 end

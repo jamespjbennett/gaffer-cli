@@ -6,7 +6,7 @@ module Gaffer
   module Narratives
     # Rules-based training-ground lines from [`Domain::CoachingContext`] + morale/form matrix.
     module CoachTrainingReport
-      STEADY = "Squad mood's middling midweek — nobody tearing it up or losing the plot.".freeze
+      STEADY = "Nobody standing out mood-wise midweek — no alarms, nobody in the crisis column.".freeze
 
       class << self
         def paragraphs(ctx)
@@ -26,7 +26,7 @@ module Gaffer
         end
 
         def coach_intro(ctx)
-          "Coach notes · #{club_label(ctx)} — who's sharp, who needs lifting."
+          "Training notes · #{club_label(ctx)} — who looks sharp, who needs a lift."
         end
 
         def club_label(ctx)
@@ -40,7 +40,7 @@ module Gaffer
         end
 
         def pill(kind)
-          kind == :rising ? "On the up:" : "Cause for concern:"
+          kind == :rising ? "Sharp in training:" : "Concern:"
         end
       end
     end

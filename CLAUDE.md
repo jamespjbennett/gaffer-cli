@@ -6,7 +6,7 @@
 
 ## Project Overview
 
-Gaffer is a terminal-based football management CLI in Ruby: **deterministic match engine**, **league loop**, dugout XI + tactics, **template scout + board copy** — with **optional LLM narrative** planned later (BYOK patterns below).
+Gaffer is a terminal-based football management CLI in Ruby: **deterministic match engine** (with **persistent morale + form** skewing XI contributions), **league loop**, dugout XI + tactics, **template scout + coaching notes + board copy** — with **optional LLM narrative** planned later (BYOK patterns below).
 
 Design goals include clean domain modelling and a narrator adapter boundary **when** Phase 3 lands.
 
@@ -61,27 +61,34 @@ gaffer/
 │   │   ├── fixture.rb, fixture_generator.rb, match.rb, match_result.rb
 │   │   ├── league_table.rb, table_row.rb
 │   │   ├── lineup.rb           # best XI (4-3-3) for sim + scout ratings
-│   │   ├── match_engine.rb     # Poisson sim, tactic multipliers, scout rating helper
+│   │   ├── match_engine.rb     # Poisson sim, morale/form multipliers on contributions, scout rating helper
+│   │   ├── morale_form_multiplier.rb  # per-player contrib band from morale + form (1–10)
+│   │   ├── morale_updater.rb   # aggregates post-round deltas (calls domain/morale/*)
+│   │   ├── morale_round_row.rb # fixture + result + home/away XI for rollup
+│   │   ├── morale/             # SideLine, ConcedeHits, DefenderPick, FixtureRoll, FormNorm, MoraleStep
 │   │   ├── scorer_picker.rb    # weighted goal scorers (same RNG as match)
 │   │   ├── goal_event.rb
-│   │   ├── scout_report.rb      # pre-match dossier value object
+│   │   ├── scout_report.rb     # opponent dossier value object
+│   │   ├── coaching_context.rb # suggested-XI notable moods for coach briefing
 │   │
 │   ├── narratives/             # Template copy only (no API)
 │   │   ├── board_expectations.rb    # onboarding board letter (`board_target`)
-│   │   └── scout_briefing.rb        # conversational paragraphs from ScoutReport
+│   │   ├── scout_briefing.rb        # conversational paragraphs from ScoutReport
+│   │   ├── coach_training_matrix.rb # worry vs cheer phrases (GK vs outfield buckets)
+│   │   └── coach_training_report.rb # CoachingContext → strings (On the up / Cause for concern)
 │   │
 │   ├── presenters/             # TTY output
 │   │   ├── matchday_squad.rb, league_table_tty.rb, league_table_view.rb
 │   │   ├── season_fixtures_tty.rb, top_scorers_tty.rb
-│   │   └── scout_briefing_tty.rb   # full-screen scout + keypress before dugout
+│   │   └── scout_briefing_tty.rb   # scout + coaching section + keypress before dugout
 │   │
 │   ├── repositories/           # Sequel persistence
-│   │   └── … club, player, manager, league, fixture, match, goal_event
+│   │   └── … club, player (form/morale batch + season age + soft reset), manager, league, fixture, match, goal_event
 │   │
 │   ├── commands/
 │   │   ├── start_league.rb, next_fixture.rb, play_match.rb
 │   │   ├── league_standings.rb, season_fixtures.rb, top_scorers.rb
-│   │   └── support/season_lookup.rb, scout_report_builder.rb, league_reads.rb
+│   │   └── support/season_lookup.rb, scout_report_builder.rb, scout_coaching_notables.rb, league_reads.rb, gameweek_* …
 │   │
 │   └── ui/
 │       ├── menu.rb             # Interactive loop
@@ -128,8 +135,8 @@ Player {
   # Derived
   overall:         Integer   # weighted avg by position
   potential:       Integer   # ceiling, used for youth/transfer interest
-  form:            Integer   # rolling avg of recent match ratings (1–10)
-  morale:          Enum[:unhappy, :unsettled, :okay, :happy, :ecstatic]
+  form:            Integer   # 1–10, 5 = neutral; updates after each played gameweek (+ decay / match events)
+  morale:          Enum[:unhappy, :unsettled, :okay, :happy, :ecstatic]  # DB string; drives contribution band with form
   contract_years:  Integer
   wage:            Integer   # weekly, in £k
 }
@@ -297,10 +304,10 @@ Pre-match dossier assembled from **SQLite only** — no LLM.
 
 **Building blocks**
 
-- **`Commands::Support::ScoutReportBuilder`** — `build(opponent_club:, managed_club:, league_id:, gameweek:, hosting_managed:, engine:)`
+- **`Commands::Support::ScoutReportBuilder`** — **`build`** assembles dossier; **`build_coaching_context`** delegates to **`Support::ScoutCoachingNotables`** (suggested **`managed_xi`** → up to **3** rising `form > 5`, up to **3** falling `form < 5`, morale only colours copy in **`CoachTrainingReport`**).
   - Table: **`LeagueTable`** + **`FixtureRepository#settled_scores_for_season`** → opponent **position**, **points**, **games played**, same for **managed** club for comparison copy.
   - **Form**: last five **`:w`/`:d`/`:l`** for the opponent, chronological subset of settled results (`recent_form_for`).
-  - **Ratings**: best XI (`Lineup.pick_best_xi`) → **`MatchEngine#attack_defense_rating_for_xi`** (balanced effective attack/defence, reputation-scaled — same internals as simulate, minus tactics/RNG).
+  - **Ratings**: best XI (`Lineup.pick_best_xi`) → **`MatchEngine#attack_defense_rating_for_xi`** (same contrib path as sim incl. morale/form multipliers — no tactics or RNG **here**).
   - **Goals**: **`GoalEventRepository#totals_by_player`** scoped to opponent → **`top_scorer`** `{ player:, goals: }` or nil.
   - **`watch_focus`**: if they have league goals → top scorer; else best **live-wire** outfield (shooting/pace/dribbling) or **enforcer** defender fallback.
 
@@ -321,14 +328,15 @@ ScoutReport {
 **Narrative layer**
 
 - **`Gaffer::Narratives::ScoutBriefing.paragraphs(report)`** — rule-based conversational paragraphs (league narrative, form band, stylistic tilt, watch-player line, outlook).
-- **`Presenters::ScoutBriefingTty.present`** — clears screen, headings + pastel body, **`TTY::Prompt#keypress`** (or prints a skip line in non-interactive tests).
+- **`Gaffer::Narratives::CoachTrainingReport`** + **`coach_training_matrix.rb`** — **`Domain::CoachingContext`** (suggested XI + notables) → **Coach ·** block: rising-band **cheer** (morale×form matrix), falling-band **worry** (form-led; GK vs outfield phrasing via matrix).
+- **`Presenters::ScoutBriefingTty.present(report:, coaching:)`** — clears screen, headings + pastel body — opponent dossier → coach strip → **`TTY::Prompt#keypress`** (skip line under non-interactive tests).
 
-**Flow in `gaffer next`** (see Commands::NextFixture)
+**Flow in `gaffer next`** (see Commands::GameweekPlay / **`NextFixture`**)
 
 1. Validates league + fixture + squad.  
-2. Builds **`Domain::ScoutReport`** (via **`Support::ScoutReportBuilder`**), renders **`ScoutBriefingTty`** (scout **before** dugout).  
+2. Builds **`Domain::ScoutReport`** + **`CoachingContext`**, renders **`ScoutBriefingTty`** (**opponent** brief + **coach** strip **before** dugout).  
 3. **`Ui::DugoutLineup`** — dugout XI prompts + compact refresh before tactics.  
-4. Tactic picker (managed side); sim whole gameweek; persist matches + **`goal_events`**.
+4. Tactic picker (managed side); sim whole gameweek; **`Support::GameweekRoundPersist`** — persist matches + **`goal_events`** + morale/form batch (+ age +1 league-wide on **final GW** completion).
 
 ---
 
@@ -365,8 +373,8 @@ The default seed is **`db/seeds/fictional_ten_teams.rb`**: **10 fictional clubs*
 See **`lib/gaffer/domain/match_engine.rb`**. Summary:
 
 - **Entry:** `simulate(home_club:, home_players:, away_club:, away_players:, home_tactic:, away_tactic:, seed:)` — keyword args, **11-player XIs** required.
-- **Flow:** per-player attack/defence contribution averages → **club reputation** scaling → **tactic multipliers** → Poisson goal counts from λ → **`ScorerPicker.pick`** fills **`MatchResult#home_scorers` / `away_scorers`** from the same `Random` stream.
-- **Public helper:** `attack_defense_rating_for_xi(club:, players:)` — balanced effective ratings (no RNG) for scout copy.
+- **Flow:** per-player attack/defence **raw** contributions (`raw_contribution_attack` / `raw_contribution_defense`) → multiplied by **`MoraleFormMultiplier`** (morale sets a band; form 1–10 slides within it) → squad means → **club reputation** scaling → **tactic multipliers** → Poisson goal counts from λ → **`ScorerPicker.pick`** fills **`MatchResult#home_scorers` / `away_scorers`** from the same `Random` stream.
+- **Public helper:** `attack_defense_rating_for_xi(club:, players:)` — uses the same contribution path (morale/form included) as sim; no tactics, no RNG — scouting / UI.
 
 ```ruby
 MatchResult = Data.define(
@@ -387,6 +395,22 @@ MatchResult = Data.define(
 | `:balanced`    | ×1.0  | ×1.0  |
 | `:defensive`   | ×0.88 | ×1.12 |
 | `:park_the_bus`| ×0.72 | ×1.28 |
+
+---
+
+### Morale & form (implemented)
+
+Stored on **`players`** (`form` integer, `morale` string → symbol in Ruby). **League rounds only:** after every fixture in a gameweek is persisted (`Support::GameweekRoundPersist`), **`Domain::MoraleUpdater`** applies rule-based deltas to every player who appeared in that round’s XI (all clubs — managed + CPU): results, scoring, clean sheets, conceded goals (weighted defender + GK penalties), passive form decay toward neutral. Updates run in the **same SQLite transaction** as matches + goal events; deltas written via **`Repositories::PlayerRepository#update_morale_form_batch`**.
+
+- **Season end:** **`Repositories::PlayerRepository#increment_age_for_league!`** adds **+1 age** for all players whose club was linked to the completed league (triggered when the final GW is saved).
+- **New season start:** **`StartLeague`** calls **`#soft_reset_morale_form_for_club_ids!`** — form drifts halfway toward **5**, morale steps one level toward **`Okay`** (before fixtures roll).
+- **Friendly `PlayMatch`:** no morale/form persistence (engine still reads current DB traits if reused elsewhere).
+
+Supporting types: **`MoraleRoundRow`**, **`Support::GameweekRoundSim::SimulateOutcome`** (XI + result for rollup), **`Domain::Morale`** collaborators (`fixture_roll`, `concede_hits`, `defender_pick`, `form_norm`, `morale_step`, `side_line`).
+
+Manual sanity script: **`test/manual/morale_form_sim_comparison.rb`** (paired morale swings vs λ).
+
+**`PlayMatch` friendlies:** no post-match morale/form writes (league GW only).
 
 ---
 
@@ -514,8 +538,8 @@ lib/gaffer/prompts/
 | Transfer negotiation text| 🔜  | Planned with transfer market                         |
 | Opponent manager logic   | ❌  | Rules-based with personality modifiers (future)       |
 | League table / stats / fixtures / scorers (`gaffer table`, `fixtures`, `scorers`) | ❌ | Pure data |
-| Pre-match scout briefing & board letter | ❌ | Template narratives from DB + `board_target` |
-| Player morale changes    | ❌  | Formula-based                                         |
+| Pre-match scout briefing, coach strip & board letter | ❌ | Template / rules from DB + `board_target` + form/morale |
+| Player morale + form changes (league) | ❌  | Formula-based batch after each GW                      |
 | Board confidence updates | ❌  | Formula-based                                         |
 
 ---
@@ -558,7 +582,8 @@ There is no separate `gaffer new` Thor task today — save creation is this onbo
 ```
 1. Validate active league, unplayed round, squads (11+ players for managed club).
 2. Scout screen (clears terminal)
-   • Conversational briefing: table vs you, form band, attack/defence read, watch player
+   • Opponent dossier: table vs you, form band, attack/defence read, watch player
+   • Coach block: morale/form-led lines for suggested-XI rising / falling players
    • Keypress → continue
 3. Dugout (MatchdaySquad)
    • Gameweek header, opposition name, full roster table, suggested XI
@@ -568,7 +593,7 @@ There is no separate `gaffer new` Thor task today — save creation is this onbo
 5. Transaction: simulate every fixture in the gameweek
    • Managed match: user XI + chosen tactic
    • Others: best XI + balanced
-   • Persist matches, goal_events, mark fixtures played, bump league.current_gameweek
+   • Persist matches, goal_events, **morale + form deltas** (`MoraleUpdater` + batched repo write), mark fixtures played, bump league.current_gameweek (final GW → **increment_age_for_league!** then complete league)
 6. Post-round UI: your result (scoreline, scorers, λ), other scorelines, standings snapshot or final table
 7. End of season: complete league, optional Start Season [Y+1]
 ```
@@ -634,6 +659,8 @@ describe Gaffer::Prompts::MatchReport do
 end
 ```
 
+**Manual** — `test/manual/morale_form_sim_comparison.rb` optional λ sanity vs morale swings (not CI).
+
 **Smoke test** *(when Claude narrator + Config exist)* — not run in CI:
 
 ```ruby
@@ -682,11 +709,11 @@ puts "Smoke test passed."
 |------|--------|--------|
 | Seed + leagues + `FixtureGenerator` | ✅ | Migrations through **`007`** (`goal_events` for scorers) |
 | **`Commands::StartLeague`** | ✅ | Menu when no active league |
-| **`gaffer next`** | ✅ | `NextFixture`: scout briefing → dugout → tactic → full-GW transaction, `goal_events` |
+| **`gaffer next`** | ✅ | Scout + coach strip → dugout → tactic → `GameweekRoundPersist` (`goal_events`, morale/form, optional season age) |
 | **`gaffer table` / `fixtures` / `scorers`** | ✅ | Archive flags `--previous` / `--year` |
 | End-of-season + roll forward | ✅ | As in `NextFixture` / `LeagueRepository` |
 
-**Still intentionally out of scope here:** transfers table, morale board/sack loops, persisted `match_selections`, injuries.
+**Still intentionally out of scope here:** transfers table, **board confidence / sack** loop, persisted `match_selections`, injuries.
 
 ---
 
@@ -694,6 +721,7 @@ puts "Smoke test passed."
 
 - [x] Tactic selection before the managed fixture (`gaffer next`)
 - [x] Interactive XI in dugout (`MatchdaySquad`), refresh after lock-in
+- [x] Pre-match **coach** strip (form/morale notables on suggested XI)
 - [x] `gaffer fixtures` for the active / archived league
 - [x] Post-round standings snippet + top scorers command (`gaffer scorers`, cap 20)
 - [ ] Standalone **`gaffer squad`** (browse roster outside match loop)
@@ -711,7 +739,7 @@ puts "Smoke test passed."
 
 ### Phase 4 — Management Depth
 - [ ] Transfer market (in/out window, `gaffer transfers`)
-- [ ] Player morale + form system
+- [x] Player morale + form (league sim skew + GW batch persist + season soft reset + age bump)
 - [ ] Board confidence + sack mechanic
 - [ ] Multiple save slots
 

@@ -1,0 +1,56 @@
+---
+description: Natural British football language for all player-facing copy in Gaffer
+globs: lib/gaffer/narratives/**/*.rb,lib/gaffer/presenters/**/*.rb,lib/gaffer/commands/support/halftime_report_builder.rb
+alwaysApply: false
+---
+
+# Football Language Standards
+
+All player-facing copy in Gaffer must read like a real football person — manager, pundit, or reporter.
+Reference tone: BBC Sport match reports, Sky Sports commentary, Match of the Day analysis.
+
+## Voice
+
+- British English, plain and direct. Short sentences.
+- Write as if spoken, not coded. No compound nouns invented for the game ("mojo", "entry count", "bursts", "hotcold").
+- Avoid any language that sounds algorithmic: "simulated possession", "train-ground composite", "fatigue load", "peak load", "intervals".
+
+## Banned phrases and their replacements
+
+| ❌ Never write | ✅ Write instead |
+|---|---|
+| "Tempo humming" | "Seeing plenty of the ball" |
+| "Entry count low (N bursts)" | "Barely troubled their defence" / "Limited going forward" |
+| "Hitting intervals — N goal landed" | "Got on the scoresheet" / "Made their pressure count" |
+| "Possession starving" | "Struggling to get on the ball" |
+| "Sharp / blunt (train-ground composite)" | "In form / Out of form" |
+| "You hot" | "In form" |
+| "You sag" | "Struggling" |
+| "They hot" | "Their danger man" |
+| "They sag" | "Their weakest link" |
+| "Cutting openings (N big openings created)" | "Creating chances" / "Looked dangerous" |
+| "Fatigue creeping (N peak load)" | "Running low on legs" / "Legs starting to go" |
+| Training metaphors (rondos, corridors, "radar on", swagger, purring as player state) | Plain: touch, tempo, shape, confidence, communication, box, press |
+
+## Halftime dossier lines
+
+- **Possession advantage:** "Bossing possession at X%" / "Seeing plenty of the ball (X%)"
+- **Goals scored:** "On the scoresheet — X goal(s)" / "Made it count in front of goal"
+- **Chances created:** "Caused real problems — X big chance(s) created"
+- **Poor possession:** "Struggling to get a foothold — only X% of the ball"
+- **Low shot count:** "Barely got near their goal in the first half"
+- **Fatigue:** "A few players will be feeling it — legs starting to go"
+
+## Player ratings strip (hot/cold)
+
+Label as: "Going well: [name]" and "Having a tough one: [name]"
+Opponent equivalents: "One to watch: [name]" and "Not at their best: [name]"
+Drop the numeric score from display — it adds nothing to a football person.
+
+## Pre-match training notes (`CoachTrainingMatrix` / `CoachTrainingReport`)
+
+- Written as a real staff coach briefing: **pace, touch, shape, confidence, communication** — not poetry.
+- **Ban** training-ground theatrics: rondos/corridors, "radar on", "swagger", "purring", "red-hot", "menace", metaphors about machines.
+- **Rising band header:** "Sharp in training:" · **Falling band:** "Concern:"
+- **Intro line:** "Training notes · {club} — who looks sharp, who needs a lift."
+- **GK worries:** crosses, kicking, commanding the box, feet, organising the back line — standard keeper coach talk.

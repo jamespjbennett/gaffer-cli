@@ -81,14 +81,14 @@ module Gaffer
 
         vibe =
           if l_ct >= w + 2 || l_ct >= 3
-            "have not been in great form"
+            "haven't been in great form"
           elsif w >= l_ct + 2 || w >= 3
-            "they're looking pretty good right now"
+            "have been in decent form lately"
           else
-            "form's been a bit patchy"
+            "form's been a bit mixed"
           end
 
-        +"Looking at form,  #{opp} #{vibe} — #{w} win#{'s' unless w == 1}, #{d} draw#{'s' unless d == 1}, #{l_ct} defeat#{'s' unless l_ct == 1} across their last #{sample}."
+        +"#{opp} #{vibe} — #{w} win#{'s' unless w == 1}, #{d} draw#{'s' unless d == 1}, #{l_ct} defeat#{'s' unless l_ct == 1} from their last #{sample}."
       end
 
       def stylistic_blurb(report, opp:, mgr_short:)
@@ -108,15 +108,15 @@ module Gaffer
 
         vs_us = +""
         if oa >= ma + DELTA_MARGIN
-          vs_us << " They are little stronger upfront than us."
+          vs_us << " They are a little stronger going forward than us."
         elsif ma >= oa + DELTA_MARGIN
-          vs_us << " Our attack should be stronger than theirs."
+          vs_us << " Our attack should have the edge over theirs."
         end
 
         if od >= md + DELTA_MARGIN
-          vs_us << " They've got a strong defence so we'll have to be clinical."
+          vs_us << " They've got a solid defence — we'll need to be clinical."
         elsif md >= od + DELTA_MARGIN
-          vs_us << " Our defence should be strong enough to keep them out as long as we stay switched on"
+          vs_us << " Our defence should be strong enough to keep them quiet."
         end
 
         skew + vs_us.to_s
@@ -138,17 +138,17 @@ module Gaffer
           g = goals.to_i
           goal_phr =
             if g.positive?
-              "#{g} goal#{g == 1 ? '' : 's'} goals this season"
+              "#{g} goal#{g == 1 ? '' : 's'} this season"
             else
-              "a nose for nuisance in the box"
+              "dangerous in and around the box"
             end
-          +"We'll need to keep an eye on #{name} — #{goal_phr}, let's keep tight on him."
+          +"Keep a close eye on #{name} — #{goal_phr}. Don't give him space."
         when :livewire
-          +"#{name}'s the one who makes things happen for them, let's get into him early and keep him quiet."
+          +"#{name} is the one who makes things happen for them. Get tight early and don't let him settle."
         when :enforcer
-          +"#{name} is their enforcer, so let's keep him under control and press high so he can't dictate play."
+          +"#{name} runs the midfield for them — press him and don't give him time on the ball."
         else
-          +"#{name}'s is one to watch out for."
+          +"#{name} is one to watch."
         end
       end
 
@@ -161,26 +161,26 @@ module Gaffer
 
         tougher = +""
         if opp_rank < our_rank
-          tougher << "They're sitting above us in the table "
+          tougher << "They're above us in the table "
           tougher <<
             if gap_pts.positive?
-              "by a decent margin, we'll have to give it everything we've got."
+              "by a decent margin — we'll have to earn every point today."
             else
-              "but only just — this is a great chance to close the gap"
+              "but only just. This is a real chance to close the gap."
             end
           return tougher
         end
 
         if our_rank < opp_rank
-          return +"We're ahead of them in the table, so let's keep the pressure on and not let them get back into it."
+          return +"We're above them in the table — keep the pressure on and don't let them back into it."
         end
 
         if gap_pts.zero?
-          +"League position is neck-and-neck; it's going to be a tight game but this is a great chance to pull away."
+          +"Level on points — whoever gets the first goal could run away with this."
         elsif opp_atk >= our_def + DELTA_MARGIN
-          +"Their attack is strong, so we shouldn't be going all out attack - let's keep it tight in our half."
+          +"Their attack is a threat — stay compact, don't leave gaps, and make sure we're hard to beat."
         else
-          +"On paper it looks 50/50 - starting the game well will be crucial to get the edge. "
+          +"It's fairly even on paper. Start well and take our chances when they come."
         end
       end
 

@@ -2,6 +2,7 @@
 
 require_relative "../narratives/scout_briefing"
 require_relative "../narratives/coach_training_report"
+require_relative "scout_report_tty"
 
 module Gaffer
   module Presenters
@@ -19,16 +20,12 @@ module Gaffer
 
       def prelude(report, pastel, out)
         wipe(out)
-        title(report, pastel, out)
+        ScoutReportTty.render(report, pastel:, out:)
         body(Narratives::ScoutBriefing.paragraphs(report), pastel, out)
       end
       def wipe(out)
         out.print("\e[2J\e[H")
         out.puts
-      end
-
-      def title(report, pastel, out)
-        out.puts pastel.bold.white("Scout · #{report.opponent.name}")
       end
 
       def body(chunks, pastel, out)

@@ -46,10 +46,10 @@ module Gaffer
             Random.new(seed)
           end
 
-        home_attack_raw  = squad_mean(home_players, :attack)
-        home_defense_raw = squad_mean(home_players, :defense)
-        away_attack_raw  = squad_mean(away_players, :attack)
-        away_defense_raw = squad_mean(away_players, :defense)
+        home_attack_raw  = squad_mean(home_players, :attack, nil)
+        home_defense_raw = squad_mean(home_players, :defense, nil)
+        away_attack_raw  = squad_mean(away_players, :attack, nil)
+        away_defense_raw = squad_mean(away_players, :defense, nil)
 
         home_attack  = apply_club_quality(home_attack_raw, home_club.reputation) * tactic_mult(home_tactic, :attack)
         home_defense = apply_club_quality(home_defense_raw, home_club.reputation) * tactic_mult(home_tactic, :defense)
@@ -79,9 +79,28 @@ module Gaffer
       # Effective attack/defence ratings for an XI exactly as `:balanced` would apply (no RNG) — scouting / UI only.
       # @return [Array(Float, Float)] attack, defence
       def attack_defense_rating_for_xi(club:, players:)
-        atk = apply_club_quality(squad_mean(players, :attack), club.reputation)
-        defw = apply_club_quality(squad_mean(players, :defense), club.reputation)
+        atk = apply_club_quality(squad_mean(players, :attack, nil), club.reputation)
+        defw = apply_club_quality(squad_mean(players, :defense, nil), club.reputation)
         [atk, defw]
+      end
+
+      # @param home [MatchLineupMoment]
+      # @param away [MatchLineupMoment]
+      # @return [Array<Float>] lam_home, lam_away, home_atk, home_def, away_atk, away_def — display ratings scaled
+      def minute_lambdas(home:, away:, rng:)
+        ha_raw = squad_mean(home.players, :attack, home.fatigue)
+        hd_raw = squad_mean(home.players, :defense, home.fatigue)
+        aa_raw = squad_mean(away.players, :attack, away.fatigue)
+        ad_raw = squad_mean(away.players, :defense, away.fatigue)
+
+        h_at = apply_club_quality(ha_raw, home.club.reputation) * tactic_mult(home.tactic, :attack)
+        h_df = apply_club_quality(hd_raw, home.club.reputation) * tactic_mult(home.tactic, :defense)
+        a_at = apply_club_quality(aa_raw, away.club.reputation) * tactic_mult(away.tactic, :attack)
+        a_df = apply_club_quality(ad_raw, away.club.reputation) * tactic_mult(away.tactic, :defense)
+
+        lam_h = lambda_goals_from_strength(h_at, a_df, home_advantage: true, rng:)
+        lam_a = lambda_goals_from_strength(a_at, h_df, home_advantage: false, rng:)
+        [lam_h, lam_a, h_at, h_df, a_at, a_df]
       end
 
       private
@@ -97,11 +116,21 @@ module Gaffer
         raw_rating * factor
       end
 
-      def squad_mean(players, mode)
-        scores = players.map { |pl| contribution(pl, mode) }
-        return DEF_EPS if scores.empty?
+      def squad_mean(players, mode, fatigue_arr)
+        return DEF_EPS if players.nil? || players.empty?
 
-        scores.sum.to_f / scores.size
+        sum = players.each_with_index.sum do |pl, i|
+          contribution(pl, mode) * fatigue_multiplier(fatigue_arr, i)
+        end
+
+        sum / players.size
+      end
+
+      def fatigue_multiplier(fatigue_arr, idx)
+        return 1.0 if fatigue_arr.nil?
+
+        f = fatigue_arr.at(idx)&.to_f || 0.0
+        1.0 - (0.5 * f)
       end
 
       def contribution(pl, mode)

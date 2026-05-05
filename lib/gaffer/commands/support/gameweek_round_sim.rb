@@ -22,12 +22,25 @@ module Gaffer
           :managed_xi
         )
 
-        SimulateOutcome = Data.define(:result, :home_xi, :away_xi)
+        SimulateOutcome = Data.define(:result, :home_xi, :away_xi, :opening_home_xi, :opening_away_xi) do
+          def morale_home_xi
+            opening_home_xi || home_xi
+          end
+
+          def morale_away_xi
+            opening_away_xi || away_xi
+          end
+        end
 
         module_function
 
         def simulate(plan)
           simulate_full(plan).result
+        end
+
+        def picked_lineups_for(plan)
+          fx = plan.fixture
+          xi_pair(plan:, hid: fx.home_club_id.to_i, aid: fx.away_club_id.to_i, mid: plan.managed_club_id.to_i)
         end
 
         def simulate_full(plan)
@@ -47,7 +60,13 @@ module Gaffer
             away_tactic: plan.away_tactic,
             seed: plan.seed
           )
-          SimulateOutcome.new(result: res, home_xi: picks.first, away_xi: picks.last)
+          SimulateOutcome.new(
+            result: res,
+            home_xi: picks.first,
+            away_xi: picks.last,
+            opening_home_xi: nil,
+            opening_away_xi: nil
+          )
         end
 
         def build_match(fixture_id:, result:)

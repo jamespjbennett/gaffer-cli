@@ -5,6 +5,7 @@ require_relative "support/scout_report_builder"
 require_relative "support/gameweek_preflight"
 require_relative "support/gameweek_tactics"
 require_relative "support/gameweek_round_persist"
+require_relative "support/interactive_league_match"
 require_relative "support/gameweek_round_tty"
 require_relative "../ui/dugout_lineup"
 require_relative "../presenters/scout_briefing_tty"
@@ -61,7 +62,7 @@ module Gaffer
             manager_tactic:, prompt:, pastel:, out:, state:
           )
 
-          summaries = simulate_and_save(state:, xi:, shape:)
+          summaries = simulate_and_save(state:, xi:, shape:, pastel:, out:, prompt:)
 
           finalize_ui(pastel:, out:, prompt:, state:, summaries:, manager_shape: shape)
           state.gameweek >= state.max_gw ? :season_completed : :ok
@@ -112,13 +113,40 @@ module Gaffer
           )
         end
 
-        def simulate_and_save(state:, xi:, shape:)
+        def simulate_and_save(state:, xi:, shape:, pastel:, out:, prompt:)
+          engine = Domain::MatchEngine.new
+          pack =
+            interactive_payload(
+              prompt: prompt,
+              state: state,
+              xi: xi,
+              shape: shape,
+              pastel: pastel,
+              out: out,
+              engine: engine
+            )
           Support::GameweekRoundPersist.run_transaction(
             state: state,
             manager_shape: shape,
             user_xi: xi,
             summary_class: Summary,
-            engine: Domain::MatchEngine.new
+            engine: engine,
+            interactive: pack
+          )
+        end
+
+        def interactive_payload(prompt:, state:, xi:, shape:, pastel:, out:, engine:)
+          return unless prompt.respond_to?(:keypress)
+
+          Support::InteractiveLeagueMatch.bundle(
+            state: state,
+            user_xi: xi,
+            manager_shape: shape,
+            pastel: pastel,
+            out: out,
+            prompt: prompt,
+            engine: engine,
+            interactive: true
           )
         end
 

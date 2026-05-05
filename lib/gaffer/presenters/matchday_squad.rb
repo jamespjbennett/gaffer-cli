@@ -8,7 +8,7 @@ module Gaffer
     module MatchdaySquad
       POS_ORDER = { gk: 0, def: 1, mid: 2, att: 3 }.freeze
 
-      FOOTNOTE = "No saved injuries yet — morale flags stress only; knack risk stays flat without post-match rolls."
+      FOOTNOTE = "Injuries not yet tracked. Mood shown as a guide — Risk column reflects morale only."
 
       module_function
 
@@ -51,7 +51,7 @@ module Gaffer
             pastel.bold("Mood"),
             pastel.bold("Phy"),
             pastel.bold("Attrs"),
-            pastel.bold("Load")
+            pastel.bold("Risk")
           ],
           rows: rows
         )
@@ -122,7 +122,7 @@ module Gaffer
       def knack_note(morale)
         case morale&.to_sym
         when :unhappy then "High"
-        when :unsettled then "Elev"
+        when :unsettled then "Med"
         else "Low"
         end
       end
