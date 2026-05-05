@@ -57,7 +57,7 @@ module Gaffer
         active = Repositories::LeagueRepository.active
         append_active_league_choices(menu) if active
         append_archived_choices(menu, archived_seasons)
-        menu.choice "Play game", :play
+        menu.choice "Play test game", :play
         menu.choice "Start new season", :start_league unless active
         menu.choice "Quit", :quit
       end

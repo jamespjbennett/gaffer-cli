@@ -686,7 +686,7 @@ puts "Smoke test passed."
 - [x] First-run onboarding: name + club selection persisted in `managers` table
 - [x] Manager identity shown in CLI header
 - [x] `bin/gaffer` opens interactive menu with GAFFER block-font hero
-- [x] Play game: simulate managed club vs foil, display result
+- [x] Play test game: simulate managed club vs foil, display result
 - [x] Match engine: Poisson goal sampling, tactic modifiers, home advantage
 - [x] Tests: match engine, **`FixtureGenerator`**, league + manager repos, DB migrations
 
